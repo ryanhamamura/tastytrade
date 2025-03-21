@@ -2,11 +2,8 @@ package tastytrade
 
 const (
 	// API endpoints
-	BaseURLProduction = "https://api.tastytrade.com"
-	BaseURLCertify    = "https://api.cert.tastytrade.com"
-
-	// API versions
-	APIVersion = "v1"
+	BaseURLProduction = "https://api.tastyworks.com"
+	BaseURLCertify    = "https://api.cert.tastyworks.com"
 
 	// Time formats
 	TimeFormat = "2006-01-02T15:04:05.000-07:00"
