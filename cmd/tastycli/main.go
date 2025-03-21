@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -17,10 +18,37 @@ var (
 	client        *tastytrade.Client
 	ctx           context.Context
 	cancel        context.CancelFunc
+	authenticated bool
 	accountNumber string
 	accounts      []tastytrade.Account
 	reader        *bufio.Reader
 )
+
+// Store the remember-me token between sessions
+func saveRememberMeToken(username, token string) error {
+	// In a real application, you'd use proper secure storage
+	// For demo purposes, we'll use a simple file
+	fileName := fmt.Sprintf("%s_token.txt", username)
+	return os.WriteFile(fileName, []byte(token), 0600)
+}
+
+// Load a saved remember-me token
+func loadRememberMeToken(username string) (string, error) {
+	fileName := fmt.Sprintf("%s_token.txt", username)
+	data, err := os.ReadFile(fileName)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// Delete a saved remember-me token
+func deleteRememberMeToken(username string) error {
+	fileName := fmt.Sprintf("%s_token.txt", username)
+	// Ignore error if file doesn't exist
+	_ = os.Remove(fileName)
+	return nil
+}
 
 func main() {
 	// Initialize
@@ -53,6 +81,7 @@ func main() {
 		fmt.Println("3. Order Placement")
 		fmt.Println("4. Order Management")
 		fmt.Println("5. Position Management")
+		fmt.Println("6. Logout")
 		fmt.Println("0. Exit")
 		fmt.Print("Select an option: ")
 
@@ -68,6 +97,8 @@ func main() {
 			orderManagementMenu()
 		case "5":
 			positionManagementMenu()
+		case "6":
+			logout()
 		case "0":
 			fmt.Println("Exiting...")
 			return
@@ -88,18 +119,106 @@ func authenticate() bool {
 	fmt.Print("Enter username: ")
 	username := readLine()
 
+	// Try to load a remember-me token
+	rememberMeToken, err := loadRememberMeToken(username)
+	if err == nil && rememberMeToken != "" {
+		fmt.Println("Found saved session token, trying to authenticate...")
+
+		// Try to authenticate with remember-me token
+		err = client.LoginWithRememberMeToken(ctx, username, rememberMeToken)
+		if err == nil {
+			fmt.Println("Authenticated successfully with saved token")
+			return true
+		}
+
+		fmt.Printf("Saved token authentication failed: %v\n", err)
+		fmt.Println("Removing invalid token and trying with password...")
+		deleteRememberMeToken(username)
+	}
+
 	fmt.Print("Enter password: ")
 	password := readLine()
 
+	fmt.Print("Remember this login? (yes/no): ")
+	rememberChoice := readLine()
+	rememberMe := strings.ToLower(rememberChoice) == "yes"
+
+	// Create login options
+	loginOpts := tastytrade.LoginOptions{
+		RememberMe: rememberMe,
+	}
+
 	fmt.Println("Authenticating...")
-	err := client.Login(ctx, username, password)
+	err = client.Login(ctx, username, password, loginOpts)
 	if err != nil {
 		fmt.Printf("Login failed: %v\n", err)
 		return false
 	}
 
+	// If login was successful and remember-me was requested, save the token
+	if rememberMe && client.RememberMeToken != "" {
+		fmt.Println("Saving authentication token for future sessions")
+		if err := saveRememberMeToken(username, client.RememberMeToken); err != nil {
+			fmt.Printf("Warning: Failed to save authentication token: %v\n", err)
+		}
+	}
+
 	fmt.Println("Authentication successful")
 	return true
+}
+
+// Handle session timeout gracefully
+func handleSessionTimeout(err error) bool {
+	// Check if the error is a session expiration error
+	if err != nil && strings.Contains(err.Error(), "session expired") {
+		fmt.Println("\nYour session has expired. Please log in again.")
+		return authenticate()
+	}
+	// Not a session timeout error
+	return false
+}
+
+// logout performs a clean logout
+func logout() {
+	// First logout from the API
+	if client.Token != "" {
+		fmt.Println("Logging out of current session...")
+		err := client.Logout(ctx)
+		if err != nil {
+			fmt.Printf("Warning: Error logging out: %v\n", err)
+		} else {
+			fmt.Println("Successfully logged out of API session")
+		}
+	}
+
+	// Handle remember-me token if present
+	if client.RememberMeToken != "" {
+		fmt.Print("Also destroy saved login token? (yes/no): ")
+		confirmLogout := readLine()
+		if strings.ToLower(confirmLogout) == "yes" {
+			fmt.Println("Destroying saved session token...")
+			err := client.DestroyRememberMeToken(ctx, client.RememberMeToken)
+			if err != nil {
+				fmt.Printf("Warning: Failed to properly destroy token: %v\n", err)
+			} else {
+				fmt.Println("Token destroyed successfully")
+			}
+
+			// Clear local token storage
+			files, _ := filepath.Glob("*_token.txt")
+			for _, file := range files {
+				_ = os.Remove(file)
+			}
+		}
+	}
+
+	// Reset client state
+	client.Token = ""
+	client.RememberMeToken = ""
+	client.SessionID = ""
+	authenticated = false
+
+	fmt.Println("Logout complete")
 }
 
 // loadAccounts loads user accounts
