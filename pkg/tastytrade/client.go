@@ -15,12 +15,13 @@ import (
 
 // Client represents a Tastytrade API client
 type Client struct {
-	BaseURL      string
-	HTTPClient   *http.Client
-	Token        string
-	RefreshToken string
-	ExpiresAt    time.Time
-	Debug        bool
+	BaseURL         string
+	HTTPClient      *http.Client
+	Token           string
+	RememberMeToken string
+	ExpiresAt       time.Time
+	Debug           bool
+	SessionID       string
 }
 
 // ClientOption is a function that configures a Client
@@ -62,12 +63,32 @@ func NewClient(useProduction bool, opts ...ClientOption) *Client {
 	return client
 }
 
+func DefaultLoginOptions() LoginOptions {
+	return LoginOptions{
+		RememberMe: false,
+	}
+}
+
 // Login authenticates with the Tastytrade API
-func (c *Client) Login(ctx context.Context, username, password string) error {
-	reqBody, err := json.Marshal(map[string]string{
+func (c *Client) Login(ctx context.Context, username, password string, opts ...LoginOptions) error {
+	// Use default login options if none provided
+	loginOpts := DefaultLoginOptions()
+	if len(opts) > 0 {
+		loginOpts = opts[0]
+	}
+
+	// Prepare request body
+	reqData := map[string]interface{}{
 		"login":    username,
 		"password": password,
-	})
+	}
+
+	// Add remember-me if requested
+	if loginOpts.RememberMe {
+		reqData["remember-me"] = true
+	}
+
+	reqBody, err := json.Marshal(reqData)
 	if err != nil {
 		return err
 	}
@@ -136,7 +157,8 @@ func (c *Client) Login(ctx context.Context, username, password string) error {
 
 	// Store the tokens
 	c.Token = authResp.SessionToken
-	c.RefreshToken = authResp.RefreshToken
+	c.RememberMeToken = authResp.RememberMeToken
+	c.SessionID = authResp.ID
 
 	// Parse expiration time if provided
 	if authResp.ExpiresAt != "" {
@@ -150,22 +172,24 @@ func (c *Client) Login(ctx context.Context, username, password string) error {
 	return nil
 }
 
-// RefreshSession refreshes the API token
-func (c *Client) RefreshSession(ctx context.Context) error {
-	if c.RefreshToken == "" {
-		return fmt.Errorf("no refresh token available")
+// LoginWithRememberMeToken authenticates using a saved remember-me token
+func (c *Client) LoginWithRememberMeToken(ctx context.Context, username, rememberMeToken string) error {
+	if rememberMeToken == "" {
+		return fmt.Errorf("remember-me token is required")
 	}
 
 	reqBody, err := json.Marshal(map[string]string{
-		"refresh-token": c.RefreshToken,
+		"login":             username,
+		"remember-me-token": rememberMeToken,
 	})
 	if err != nil {
 		return err
 	}
 
 	var authResp AuthResponse
-	// Note: no version in the URL
-	url := fmt.Sprintf("%s/sessions/refresh", c.BaseURL)
+
+	// Create request for auth with remember-me token
+	url := fmt.Sprintf("%s/sessions", c.BaseURL)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqBody))
 	if err != nil {
 		return err
@@ -176,10 +200,10 @@ func (c *Client) RefreshSession(ctx context.Context) error {
 	req.Header.Set("Accept", "application/json")
 
 	if c.Debug {
-		fmt.Printf("Making POST request to %s\n", url)
+		fmt.Printf("Making POST request to %s with remember-me token\n", url)
 	}
 
-	// Execute the request
+	// Execute request
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return err
@@ -216,7 +240,8 @@ func (c *Client) RefreshSession(ctx context.Context) error {
 
 	// Store the tokens
 	c.Token = authResp.SessionToken
-	c.RefreshToken = authResp.RefreshToken
+	c.RememberMeToken = authResp.RememberMeToken
+	c.SessionID = authResp.ID
 
 	// Parse expiration time if provided
 	if authResp.ExpiresAt != "" {
@@ -230,19 +255,132 @@ func (c *Client) RefreshSession(ctx context.Context) error {
 	return nil
 }
 
+// DestroyRememberMeToken invalidates a remember-me token
+func (c *Client) DestroyRememberMeToken(ctx context.Context, rememberMeToken string) error {
+	// According to the documentation, this endpoint destroys a remember-me token
+	url := fmt.Sprintf("%s/sessions/remember-me", c.BaseURL)
+
+	reqBody, err := json.Marshal(map[string]string{
+		"remember-me-token": rememberMeToken,
+	})
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "DELETE", url, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return err
+	}
+
+	// Set required headers
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	// Execute the request
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Check for success
+	if resp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(resp.Body)
+		var errResp ErrorResponse
+		if err := json.Unmarshal(respBody, &errResp); err != nil {
+			return &APIError{
+				StatusCode: resp.StatusCode,
+				Message:    string(respBody),
+			}
+		}
+
+		return &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    errResp.Message,
+			Errors:     errResp.Errors,
+		}
+	}
+
+	// Clear the remember-me token from the client
+	if c.RememberMeToken == rememberMeToken {
+		c.RememberMeToken = ""
+	}
+
+	return nil
+}
+
+// Logout destroys the current session
+func (c *Client) Logout(ctx context.Context) error {
+	if c.Token == "" || c.SessionID == "" {
+		return fmt.Errorf("no active session")
+	}
+
+	// According to the documentation, this endpoint destroys a session
+	url := fmt.Sprintf("%s/sessions/%s", c.BaseURL, c.SessionID)
+
+	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
+	if err != nil {
+		return err
+	}
+
+	// Set required headers
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", c.Token)
+
+	// Execute the request
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Check for success
+	if resp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(resp.Body)
+		var errResp ErrorResponse
+		if err := json.Unmarshal(respBody, &errResp); err != nil {
+			return &APIError{
+				StatusCode: resp.StatusCode,
+				Message:    string(respBody),
+			}
+		}
+
+		return &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    errResp.Message,
+			Errors:     errResp.Errors,
+		}
+	}
+
+	// Clear the session information
+	c.Token = ""
+	c.SessionID = ""
+
+	return nil
+}
+
 // EnsureValidToken ensures the token is valid, refreshing if needed
 func (c *Client) EnsureValidToken(ctx context.Context) error {
-	// Check if token will expire in the next minute
-	if c.Token != "" && time.Until(c.ExpiresAt) > time.Minute {
-		return nil
+	if c.Token == "" {
+		return fmt.Errorf("no active session, authentication required")
+	}
+	if time.Until(c.ExpiresAt) <= time.Minute {
+		return fmt.Errorf("session expired, re-authentication required")
 	}
 
 	// Token expired or about to expire, refresh it
-	return c.RefreshSession(ctx)
+	return nil
 }
 
 // doRequest is used for all other API requests after authentication
 func (c *Client) doRequest(ctx context.Context, method, endpoint string, body io.Reader, auth bool, v interface{}) error {
+	// If authentication is required, verify the token
+	if auth {
+		if err := c.EnsureValidToken(ctx); err != nil {
+			return err
+		}
+	}
+
 	// Normalize endpoint path
 	if !strings.HasPrefix(endpoint, "/") {
 		endpoint = "/" + endpoint

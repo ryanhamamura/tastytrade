@@ -11,10 +11,16 @@ const (
 
 // AuthResponse represents the authentication response
 type AuthResponse struct {
-	SessionToken string `json:"session-token"`
-	RefreshToken string `json:"refresh-token"`
-	ExpiresAt    string `json:"expires-at"`
-	User         User   `json:"user"`
+	SessionToken    string `json:"session_token"`
+	RememberMeToken string `json:"remember_me_token,omitempty"`
+	ExpiresAt       string `json:"expires_at"`
+	User            User   `json:"user"`
+	ID              string `json:"id,omitempty"`
+}
+
+// LoginOptions contains options for the login process
+type LoginOptions struct {
+	RememberMe bool
 }
 
 // User represents a Tastytrade user
