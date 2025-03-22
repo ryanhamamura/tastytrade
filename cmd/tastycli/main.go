@@ -128,6 +128,15 @@ func authenticate() bool {
 		err = client.LoginWithRememberMeToken(ctx, username, rememberMeToken)
 		if err == nil {
 			fmt.Println("Authenticated successfully with saved token")
+
+			// Debug token information
+			if client.Debug {
+				fmt.Printf("Token: %s\n", maskToken(client.Token))
+				fmt.Printf("Session ID: %s\n", client.SessionID)
+				fmt.Printf("Token expires at: %s\n", client.ExpiresAt.Format(time.RFC3339))
+				fmt.Printf("Time until expiration: %s\n", time.Until(client.ExpiresAt))
+			}
+
 			return true
 		}
 
@@ -165,6 +174,14 @@ func authenticate() bool {
 
 	fmt.Println("Authentication successful")
 	return true
+}
+
+// Helper function to mask token for debug printing
+func maskToken(token string) string {
+	if len(token) <= 10 {
+		return "****"
+	}
+	return token[:5] + "..." + token[len(token)-5:]
 }
 
 // Handle session timeout gracefully

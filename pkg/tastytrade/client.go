@@ -13,20 +13,6 @@ import (
 	"time"
 )
 
-// Client represents a Tastytrade API client
-type Client struct {
-	BaseURL         string
-	HTTPClient      *http.Client
-	Token           string
-	RememberMeToken string
-	ExpiresAt       time.Time
-	Debug           bool
-	SessionID       string
-}
-
-// ClientOption is a function that configures a Client
-type ClientOption func(*Client)
-
 // WithHTTPClient sets a custom HTTP client
 func WithHTTPClient(httpClient *http.Client) ClientOption {
 	return func(c *Client) {
@@ -69,6 +55,30 @@ func DefaultLoginOptions() LoginOptions {
 	}
 }
 
+// parseTime is a helper function to parse time using multiple formats
+func parseTime(timeStr string, debug bool) (time.Time, bool) {
+	// Try several time formats since the API might return different formats
+	timeFormats := []string{
+		time.RFC3339,                    // Standard format with seconds precision: "2006-01-02T15:04:05Z07:00"
+		time.RFC3339Nano,                // With nanoseconds: "2006-01-02T15:04:05.999999999Z07:00"
+		"2006-01-02T15:04:05.000Z",      // Common format with milliseconds and Z timezone
+		"2006-01-02T15:04:05.000-07:00", // Format with timezone offset
+	}
+
+	for _, format := range timeFormats {
+		expTime, err := time.Parse(format, timeStr)
+		if err == nil {
+			return expTime, true
+		}
+	}
+
+	if debug {
+		fmt.Printf("Failed to parse time '%s' with standard formats\n", timeStr)
+	}
+
+	return time.Now().Add(24 * time.Hour), false
+}
+
 // Login authenticates with the Tastytrade API
 func (c *Client) Login(ctx context.Context, username, password string, opts ...LoginOptions) error {
 	// Use default login options if none provided
@@ -92,8 +102,6 @@ func (c *Client) Login(ctx context.Context, username, password string, opts ...L
 	if err != nil {
 		return err
 	}
-
-	var authResp AuthResponse
 
 	// Create request for authentication - note: no version in the URL
 	url := fmt.Sprintf("%s/sessions", c.BaseURL)
@@ -151,22 +159,44 @@ func (c *Client) Login(ctx context.Context, username, password string, opts ...L
 	}
 
 	// Parse authentication response
+	var authResp struct {
+		SessionResponse AuthResponse `json:"data"`
+	}
+
 	if err := json.Unmarshal(respBody, &authResp); err != nil {
-		return fmt.Errorf("failed to parse auth response: %w", err)
+		// Try direct unmarshaling if wrapper format fails
+		if err2 := json.Unmarshal(respBody, &authResp.SessionResponse); err2 != nil {
+			return fmt.Errorf("failed to parse auth response: %w", err)
+		}
 	}
 
 	// Store the tokens
-	c.Token = authResp.SessionToken
-	c.RememberMeToken = authResp.RememberMeToken
-	c.SessionID = authResp.ID
+	c.Token = authResp.SessionResponse.SessionToken
+	c.RememberMeToken = authResp.SessionResponse.RememberMeToken
+
+	// Store session ID if available
+	if authResp.SessionResponse.User.ExternalID != "" {
+		c.SessionID = authResp.SessionResponse.User.ExternalID
+	}
 
 	// Parse expiration time if provided
-	if authResp.ExpiresAt != "" {
-		expTime, err := time.Parse(TimeFormat, authResp.ExpiresAt)
-		if err != nil {
-			return fmt.Errorf("failed to parse expiration time: %w", err)
+	if authResp.SessionResponse.SessionExpiration != "" {
+		expTime, success := parseTime(authResp.SessionResponse.SessionExpiration, c.Debug)
+		if success {
+			c.ExpiresAt = expTime
+		} else {
+			// Set a default expiration (24 hours from now) as fallback
+			c.ExpiresAt = time.Now().Add(24 * time.Hour)
 		}
-		c.ExpiresAt = expTime
+	} else {
+		// No expiration provided, set a default (24 hours from now)
+		c.ExpiresAt = time.Now().Add(24 * time.Hour)
+	}
+
+	if c.Debug {
+		fmt.Printf("Authentication successful. Token: %s\n", c.Token)
+		fmt.Printf("Remember-me token: %s\n", c.RememberMeToken)
+		fmt.Printf("Session expiration: %s\n", c.ExpiresAt.Format(time.RFC3339))
 	}
 
 	return nil
@@ -178,15 +208,13 @@ func (c *Client) LoginWithRememberMeToken(ctx context.Context, username, remembe
 		return fmt.Errorf("remember-me token is required")
 	}
 
-	reqBody, err := json.Marshal(map[string]string{
-		"login":             username,
-		"remember-me-token": rememberMeToken,
+	reqBody, err := json.Marshal(map[string]interface{}{
+		"login":          username,
+		"remember-token": rememberMeToken,
 	})
 	if err != nil {
 		return err
 	}
-
-	var authResp AuthResponse
 
 	// Create request for auth with remember-me token
 	url := fmt.Sprintf("%s/sessions", c.BaseURL)
@@ -234,22 +262,39 @@ func (c *Client) LoginWithRememberMeToken(ctx context.Context, username, remembe
 	}
 
 	// Parse authentication response
+	var authResp struct {
+		SessionResponse AuthResponse `json:"data"`
+	}
+
 	if err := json.Unmarshal(respBody, &authResp); err != nil {
-		return fmt.Errorf("failed to parse auth response: %w", err)
+		// Try direct unmarshaling if wrapper format fails
+		if err2 := json.Unmarshal(respBody, &authResp.SessionResponse); err2 != nil {
+			return fmt.Errorf("failed to parse auth response: %w - %w", err, err2)
+		}
 	}
 
 	// Store the tokens
-	c.Token = authResp.SessionToken
-	c.RememberMeToken = authResp.RememberMeToken
-	c.SessionID = authResp.ID
+	c.Token = authResp.SessionResponse.SessionToken
+	c.RememberMeToken = authResp.SessionResponse.RememberMeToken
+
+	// Store session ID if available
+	if authResp.SessionResponse.User.ExternalID != "" {
+		c.SessionID = authResp.SessionResponse.User.ExternalID
+	}
 
 	// Parse expiration time if provided
-	if authResp.ExpiresAt != "" {
-		expTime, err := time.Parse(TimeFormat, authResp.ExpiresAt)
+	if authResp.SessionResponse.SessionExpiration != "" {
+		expTime, err := time.Parse(TimeFormat, authResp.SessionResponse.SessionExpiration)
 		if err != nil {
 			return fmt.Errorf("failed to parse expiration time: %w", err)
 		}
 		c.ExpiresAt = expTime
+	}
+
+	if c.Debug {
+		fmt.Printf("Authentication successful with remember token. Token: %s\n", c.Token)
+		fmt.Printf("Remember-me token: %s\n", c.RememberMeToken)
+		fmt.Printf("Session expiration: %s\n", c.ExpiresAt.Format(time.RFC3339))
 	}
 
 	return nil
@@ -364,11 +409,21 @@ func (c *Client) EnsureValidToken(ctx context.Context) error {
 	if c.Token == "" {
 		return fmt.Errorf("no active session, authentication required")
 	}
-	if time.Until(c.ExpiresAt) <= time.Minute {
+
+	// Check if token is expired or about to expire (less than 5 minutes left)
+	if time.Until(c.ExpiresAt) <= 5*time.Minute {
+		if c.Debug {
+			fmt.Println("Session token is about to expire, attempting to refresh")
+		}
+
+		// If remember-me token is available, try to use it
+		if c.RememberMeToken != "" {
+			// This is a simplified version; you might need more complex logic
+			// for token refresh based on API's capabilities
+			return fmt.Errorf("session expired, re-authentication required")
+		}
 		return fmt.Errorf("session expired, re-authentication required")
 	}
-
-	// Token expired or about to expire, refresh it
 	return nil
 }
 
@@ -416,6 +471,9 @@ func (c *Client) doRequest(ctx context.Context, method, endpoint string, body io
 
 	if c.Debug {
 		fmt.Printf("Making %s request to %s\n", method, fullURL)
+		if auth {
+			fmt.Printf("Using authorization token: %s\n", c.Token)
+		}
 		if body != nil {
 			bodyBytes, _ := io.ReadAll(body)
 			// Reset the body for the actual request
@@ -468,7 +526,21 @@ func (c *Client) doRequest(ctx context.Context, method, endpoint string, body io
 		return nil
 	}
 
+	// Try to parse the response as a data wrapper first
+	var dataWrapper struct {
+		Data json.RawMessage `json:"data"`
+	}
+
 	// Parse the response
+	if err := json.Unmarshal(respBody, &dataWrapper); err != nil && len(dataWrapper.Data) > 0 {
+		// If we have data in the wrapper, unmarshal just that part
+		if err := json.Unmarshal(dataWrapper.Data, v); err != nil {
+			return fmt.Errorf("failed to parse response data: %w", err)
+		}
+		return nil
+	}
+
+	// If no data wrapper, try direct unmarshaling
 	if err := json.Unmarshal(respBody, v); err != nil {
 		return fmt.Errorf("failed to parse response: %w", err)
 	}
