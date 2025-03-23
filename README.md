@@ -4,13 +4,15 @@ A comprehensive, type-safe Go client for the [TastyTrade API](https://developer.
 
 ## Features
 
-- **Type-Safe API**: Strongly-typed interfaces matching TastyTrade's API requirements
-- **Authentication Management**: Built-in token refresh and session handling
-- **Comprehensive Order Support**: All order types supported including complex orders
-- **Streaming Support**: Tools for real-time market data and account updates
-- **Robust Error Handling**: Detailed error types and validation
+- **Type-Safe API**: Strongly-typed structs matching TastyTrade's API responses
+- **Authentication Management**: Built-in token handling with automatic session management
+- **Account Management**: Access to customer and account details
+- **Market Data**: Real-time and delayed quote functionality
+- **Streaming Support**: Tools for real-time data via quote tokens
+- **Robust Error Handling**: Detailed error types with response information
 - **Context Support**: All methods accept context for timeout/cancellation
-- **Helper Methods**: Convenience functions for common operations
+- **Debug Mode**: Optional detailed logging of API requests and responses
+- **Environment Support**: Use certification (sandbox) or production environments
 
 ## Installation
 
@@ -29,11 +31,11 @@ import (
     "log"
     "time"
     
-    "github.com/ryanhamamura/tastytrade"
+    "github.com/ryanhamamura/tastytrade/pkg/tastytrade"
 )
 
 func main() {
-    // Create a client (false = use certification environment)
+    // Create a client (false = use certification/sandbox environment)
     client := tastytrade.NewClient(false)
     
     // Create context with timeout
@@ -46,204 +48,77 @@ func main() {
         log.Fatalf("Login failed: %v", err)
     }
     
+    // Get customer information
+    customer, err := client.GetCustomer(ctx, "me", false)
+    if err != nil {
+        log.Fatalf("Failed to get customer info: %v", err)
+    }
+    fmt.Printf("Logged in as: %s %s (%s)\n", customer.FirstName, customer.LastName, customer.Email)
+    
     // Get user accounts
-    accounts, err := client.GetAccounts(ctx)
+    accounts, err := client.GetCustomerAccounts(ctx, "me")
     if err != nil {
         log.Fatalf("Failed to get accounts: %v", err)
     }
     
     // Print account details
-    for _, account := range accounts {
-        fmt.Printf("Account: %s (%s)\n", account.Name, account.AccountNumber)
-    }
-    
-    // Get quotes for symbols
-    quotes, err := client.GetQuotes(ctx, []string{"AAPL", "SPY", "TSLA"})
-    if err != nil {
-        log.Fatalf("Failed to get quotes: %v", err)
-    }
-    
-    // Print quote data
-    for symbol, quote := range quotes {
-        fmt.Printf("%s: Last Price: $%.2f\n", symbol, quote.LastPrice)
+    for i, account := range accounts {
+        fmt.Printf("%d. Account: %s (%s)\n", 
+            i+1, 
+            account.Account.AccountNumber,
+            account.Account.AccountTypeName)
     }
 }
 ```
 
 ## Authentication
 
-The client handles authentication and token refresh automatically. Simply use the `Login` method with your TastyTrade username and password:
+The client handles authentication with the TastyTrade API. Use the `Login` method with your TastyTrade username and password:
 
 ```go
 err := client.Login(ctx, "your-username", "your-password")
 ```
 
-The client will store the session token and refresh it automatically when needed via the `EnsureValidToken` method that's called internally by all API methods.
+For returning users, you can use a remember-me token for authentication:
+
+```go
+err := client.LoginWithRememberMeToken(ctx, "your-username", "your-remember-me-token")
+```
+
+When finished, you can explicitly log out:
+
+```go
+err := client.Logout(ctx)
+```
+
+The client will automatically handle token validation via the `EnsureValidToken` method that's called internally by all API methods.
 
 ## Account Information
 
-Get information about user accounts and their balances:
+Retrieve information about customers and their accounts:
 
 ```go
-// Get all accounts
-accounts, err := client.GetAccounts(ctx)
+// Get customer information (use "me" for the current authenticated user)
+customer, err := client.GetCustomer(ctx, "me", false)
 
-// Get account balances
-balances, err := client.GetBalances(ctx, accountNumber)
+// Get all accounts for a customer
+accounts, err := client.GetCustomerAccounts(ctx, "me")
 
-// Get account positions
-positions, err := client.GetPositions(ctx, accountNumber)
+// Get specific account details
+account, err := client.GetCustomerAccount(ctx, "me", "your-account-number")
 ```
 
 ## Market Data
 
-Retrieve quotes, option chains, and other market data:
+Get real-time quotes using quote tokens:
 
 ```go
-// Get quotes for multiple symbols
-quotes, err := client.GetQuotes(ctx, []string{"AAPL", "SPY", "TSLA"})
+// Get API quote tokens
+quoteToken, err := client.GetAPIQuoteTokens(ctx)
 
-// Get option chain for a symbol
-chains, err := client.GetOptionChain(ctx, "AAPL")
-
-// Get quote for a single symbol
-quote, err := client.GetQuote(ctx, "AAPL")
-```
-
-## Order Placement
-
-The package supports all TastyTrade order types including market, limit, stop, stop-limit, and notional market orders.
-
-### Basic Order Placement
-
-```go
-// Place a market order (using helper method)
-resp, err := client.PlaceEquityMarketOrder(
-    ctx,
-    accountNumber,
-    "AAPL",
-    5, // 5 shares
-    tastytrade.OrderDirectionBuyToOpen,
-)
-
-// Place a limit order
-quantity := 10.0
-price := 150.0
-priceEffect := tastytrade.PriceEffectDebit
-
-order := tastytrade.OrderRequest{
-    OrderType:   tastytrade.OrderTypeLimit,
-    TimeInForce: tastytrade.TimeInForceDay,
-    Price:       &price,
-    PriceEffect: &priceEffect,
-    Legs: []tastytrade.OrderLeg{
-        {
-            Symbol:         "AAPL",
-            Quantity:       &quantity,
-            Action:         tastytrade.OrderDirectionBuyToOpen,
-            InstrumentType: tastytrade.InstrumentTypeEquity,
-        },
-    },
-}
-
-resp, err := client.PlaceOrder(ctx, accountNumber, order)
-```
-
-### Fractional Share Orders (Notional Market Orders)
-
-```go
-// Place a notional market order (dollar-based)
-resp, err := client.PlaceEquityNotionalMarketOrder(
-    ctx,
-    accountNumber,
-    "AAPL",
-    100.0, // $100 worth of shares
-    tastytrade.OrderDirectionBuyToOpen,
-)
-```
-
-### Option Strategies
-
-```go
-// Place a vertical call spread
-resp, err := client.PlaceEquityOptionSpreadOrder(
-    ctx,
-    accountNumber,
-    "AAPL  230721C00190000", // Sell the $190 call
-    "AAPL  230721C00195000", // Buy the $195 call
-    1.0,                     // 1 contract (represents 100 shares)
-    1.25,                    // $1.25 credit ($125 total)
-    tastytrade.TimeInForceDay,
-)
-```
-
-### Complex Orders (OTOCO, OCO)
-
-```go
-// Build a One-Triggers-OCO (OTOCO) order
-// First create the entry order
-triggerOrder := tastytrade.OrderRequest{
-    OrderType:   tastytrade.OrderTypeLimit,
-    TimeInForce: tastytrade.TimeInForceDay,
-    Price:       &entryPrice,
-    PriceEffect: &entryPriceEffect,
-    Legs: []tastytrade.OrderLeg{
-        {
-            Symbol:         "AAPL",
-            Quantity:       &entryQty,
-            Action:         tastytrade.OrderDirectionBuyToOpen,
-            InstrumentType: tastytrade.InstrumentTypeEquity,
-        },
-    },
-}
-
-// Create the profit target and stop loss orders
-// ... (see examples in documentation)
-
-// Bundle them into a complex order
-complexOrder := tastytrade.ComplexOrderRequest{
-    Type:         tastytrade.ComplexOrderTypeOTOCO,
-    TriggerOrder: &triggerOrder,
-    Orders:       []tastytrade.OrderRequest{profitOrder, stopOrder},
-}
-
-// Place the complex order
-resp, err := client.PlaceComplexOrder(ctx, accountNumber, complexOrder)
-```
-
-### Order Validation
-
-Validate orders before submission:
-
-```go
-// Dry-run to validate an order
-dryRunResp, err := client.DryRunOrder(ctx, accountNumber, order)
-if err != nil {
-    log.Fatalf("Order validation failed: %v", err)
-}
-
-// Check for warnings
-if len(dryRunResp.Warnings) > 0 {
-    fmt.Println("Order has warnings:")
-    for _, warning := range dryRunResp.Warnings {
-        fmt.Printf("- %s\n", warning)
-    }
-}
-```
-
-## Order Management
-
-Manage existing orders:
-
-```go
-// Get all orders for an account
-orders, err := client.GetOrders(ctx, accountNumber)
-
-// Get a specific order
-order, err := client.GetOrder(ctx, accountNumber, orderID)
-
-// Cancel an order
-err := client.CancelOrder(ctx, accountNumber, orderID)
+// The quote token can be used with streaming services
+fmt.Printf("Quote token: %s\n", quoteToken.Token)
+fmt.Printf("Websocket URL: %s\n", quoteToken.WebsocketURL)
 ```
 
 ## Error Handling
@@ -251,14 +126,19 @@ err := client.CancelOrder(ctx, accountNumber, orderID)
 The package provides detailed error types for API errors:
 
 ```go
-resp, err := client.PlaceOrder(ctx, accountNumber, order)
+customer, err := client.GetCustomer(ctx, "me", false)
 if err != nil {
     // Check if it's an API error
     if apiErr, ok := tastytrade.IsAPIError(err); ok {
         if apiErr.IsNotFound() {
             // Handle 404 errors
+            fmt.Println("Customer not found")
         } else if apiErr.IsUnauthorized() {
             // Handle authentication errors
+            fmt.Println("Authentication required")
+        } else if apiErr.IsForbidden() {
+            // Handle permission errors
+            fmt.Println("Permission denied") 
         } else {
             // Handle other API errors
             fmt.Printf("API Error: %s\n", apiErr.Error())
@@ -299,20 +179,48 @@ Enable debug logging to see all API requests and responses:
 client := tastytrade.NewClient(false, tastytrade.WithDebug(true))
 ```
 
+### Environment Selection
+
+Choose between certification (sandbox) and production environments:
+
+```go
+// Use the certification/sandbox environment (default)
+client := tastytrade.NewClient(false)
+
+// Use the production environment
+client := tastytrade.NewClient(true)
+```
+
+## CLI Testing Tool
+
+The repository includes a CLI tool for testing the API:
+
+```bash
+go run cmd/tastycli/main.go
+```
+
+The CLI allows you to:
+- Choose between sandbox and production environments
+- Login with your credentials
+- List accounts
+- Get customer details
+- Retrieve quote tokens
+- And more
+
 ## Package Structure
 
 The package is organized into logical files:
 
 - `client.go`: Core client and authentication functionality
-- `accounts.go`: Account management methods
-- `positions.go`: Position retrieval methods
-- `orders.go`: Order management and placement
-- `quotes.go`: Market data methods
-- `options.go`: Option chain functionality
-- `models.go`: Shared data models
+- `accounts.go`: Account and customer management methods
 - `errors.go`: Error types and handling
+- `models.go`: Shared data models and constants
 
 ## Development and Testing
+
+### Requirements
+
+- Go 1.23.6 or higher
 
 ### Testing
 
@@ -322,10 +230,6 @@ Run the tests with:
 go test ./...
 ```
 
-### Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
@@ -333,3 +237,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Disclaimer
 
 This package is not officially affiliated with TastyTrade. Use at your own risk.
+
+## Contribution
+
+Contributions are welcome! Please feel free to submit a Pull Request.
