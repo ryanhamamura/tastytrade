@@ -21,6 +21,11 @@ const (
 	cmdCustomer   = "customer"
 	cmdQuoteToken = "quotetoken"
 	cmdExit       = "exit"
+
+	// New instrument-related commands
+	cmdInstrument  = "instrument"
+	cmdOptionChain = "optionchain"
+	cmdExpirations = "expirations"
 )
 
 func main() {
@@ -90,8 +95,7 @@ func main() {
 			isAuthenticated = true
 
 		case cmdLogout:
-			if !isAuthenticated {
-				fmt.Println("Not logged in.")
+			if !checkAuth(isAuthenticated) {
 				continue
 			}
 
@@ -191,6 +195,100 @@ func main() {
 			fmt.Printf("Websocket URL: %s\n", token.WebsocketURL)
 			fmt.Printf("DXLink URL: %s\n", token.DxlinkURL)
 
+		case cmdInstrument:
+			if !checkAuth(isAuthenticated) {
+				continue
+			}
+
+			if len(args) < 2 {
+				fmt.Println("Usage: instrument <type> <symbol>")
+				fmt.Println("Types: equity, equity-option")
+				continue
+			}
+
+			instrType := args[1]
+
+			if len(args) != 3 {
+				fmt.Printf("Usage: instrument %s <symbol>\n", instrType)
+				continue
+			}
+
+			symbol := args[2]
+
+			switch instrType {
+			case "equity":
+				equity, err := client.GetEquity(ctx, symbol)
+				if err != nil {
+					fmt.Printf("Failed to get equity: %v\n", err)
+					continue
+				}
+				printEquity(equity)
+
+			case "equity-option":
+				option, err := client.GetEquityOption(ctx, symbol)
+				if err != nil {
+					fmt.Printf("Failed to get equity option: %v\n", err)
+					continue
+				}
+				printEquityOption(option)
+
+			default:
+				fmt.Printf("Unsupported instrument type: %s\n", instrType)
+				fmt.Println("Supported types: equity, equity-option")
+			}
+
+		case cmdOptionChain:
+			if !checkAuth(isAuthenticated) {
+				continue
+			}
+
+			if len(args) < 2 {
+				fmt.Println("Usage: optionchain <symbol>")
+				fmt.Println("Example: optionchain AAPL")
+				continue
+			}
+
+			symbol := args[1]
+
+			options, err := client.GetOptionChain(ctx, symbol)
+			if err != nil {
+				fmt.Printf("Failed to get option chain: %v\n", err)
+				continue
+			}
+
+			fmt.Printf("Found %d options for %s:\n", len(options), symbol)
+			printOptionChain(options)
+
+		case cmdExpirations:
+			if !checkAuth(isAuthenticated) {
+				continue
+			}
+
+			if len(args) != 2 {
+				fmt.Println("Usage: expirations <symbol>")
+				continue
+			}
+
+			symbol := args[1]
+
+			expirations, err := client.GetActiveExpirations(ctx, symbol)
+			if err != nil {
+				fmt.Printf("Failed to get expirations: %v\n", err)
+				continue
+			}
+
+			fmt.Printf("Available expirations for %s:\n", symbol)
+			fmt.Printf("%-12s %-10s %-12s %-10s\n", "Date", "Days Left", "Type", "Settlement")
+			fmt.Println(strings.Repeat("-", 50))
+
+			for _, exp := range expirations {
+				fmt.Printf("%-12s %-10d %-12s %-10s\n",
+					exp.ExpirationDate,
+					exp.DaysToExpiration,
+					exp.ExpirationType,
+					exp.SettlementType)
+			}
+
 		case cmdExit:
 			fmt.Println("Goodbye!")
 			return
@@ -220,6 +318,13 @@ func printHelp(isAuthenticated bool) {
 		fmt.Println("  account <customer_id> <acct#>  - Get specific account details")
 		fmt.Println("  customer <customer_id> [allow-missing] - Get customer details")
 		fmt.Println("  quotetoken                     - Get API quote token")
+
+		// Instrument commands help
+		fmt.Println("\nInstrument Commands:")
+		fmt.Println("  instrument equity <symbol>     - Get details for a specific equity")
+		fmt.Println("  instrument equity-option <symbol> - Get details for a specific equity option")
+		fmt.Println("  optionchain <symbol>           - Get option chain for a symbol")
+		fmt.Println("  expirations <symbol>           - Get available expiration dates for options")
 	}
 	fmt.Println("  exit                           - Exit the program")
 }
@@ -286,6 +391,153 @@ func printCustomer(customer *tastytrade.Customer) {
 	}
 
 	fmt.Printf("\nCreated: %s\n", customer.CreatedAt.Format("Jan 2, 2006"))
+}
+
+// Helper functions for printing different instrument types
+func printInstrumentDetails(symbol, instrumentType string, active bool, description string) {
+	fmt.Println("Instrument Details:")
+	fmt.Printf("Symbol: %s\n", symbol)
+	fmt.Printf("Type: %s\n", instrumentType)
+	fmt.Printf("Description: %s\n", description)
+	fmt.Printf("Active: %v\n", active)
+}
+
+func printEquity(equity *tastytrade.Equity) {
+	printInstrumentDetails(equity.Symbol, equity.InstrumentType, equity.Active, equity.Description)
+
+	if equity.ShortDescription != "" {
+		fmt.Printf("Short Description: %s\n", equity.ShortDescription)
+	}
+	fmt.Printf("Listed Market: %s\n", equity.ListedMarket)
+	fmt.Printf("Is ETF: %v\n", equity.IsETF)
+	fmt.Printf("Is Index: %v\n", equity.IsIndex)
+	fmt.Printf("Lendability: %s\n", equity.Lendability)
+	fmt.Printf("Borrow Rate: %s\n", equity.BorrowRate)
+	fmt.Printf("Fractional Quantity Eligible: %v\n", equity.IsFractionalQuantityEligible)
+	fmt.Printf("Is Illiquid: %v\n", equity.IsIlliquid)
+
+	if len(equity.TickSizes) > 0 {
+		fmt.Println("\nTick Sizes:")
+		for _, tick := range equity.TickSizes {
+			if tick.Threshold != nil {
+				fmt.Printf("  %s (threshold: %s)\n", tick.Value, *tick.Threshold)
+			} else {
+				fmt.Printf("  %s\n", tick.Value)
+			}
+		}
+	}
+}
+
+func printEquityOption(option *tastytrade.EquityOption) {
+	printInstrumentDetails(option.Symbol, option.InstrumentType, option.Active, option.Description)
+
+	fmt.Printf("Underlying: %s\n", option.UnderlyingSymbol)
+	fmt.Printf("Root Symbol: %s\n", option.RootSymbol)
+	fmt.Printf("Option Type: %s\n", option.OptionType)
+	fmt.Printf("Strike Price: $%.2f\n", option.StrikePrice)
+	fmt.Printf("Expiration Date: %s\n", option.ExpirationDate)
+	fmt.Printf("Days to Expiration: %d\n", option.DaysToExpiration)
+	fmt.Printf("Exercise Style: %s\n", option.ExerciseStyle)
+	fmt.Printf("Shares Per Contract: %d\n", option.SharesPerContract)
+	fmt.Printf("Settlement Type: %s\n", option.SettlementType)
+
+	if !option.StopsTradingAt.IsZero() {
+		fmt.Printf("Stops Trading At: %s\n", option.StopsTradingAt.Format(time.RFC3339))
+	}
+
+	if !option.ExpiresAt.IsZero() {
+		fmt.Printf("Expires At: %s\n", option.ExpiresAt.Format(time.RFC3339))
+	}
+}
+
+func printOptionChain(options []tastytrade.EquityOption) {
+	if len(options) == 0 {
+		fmt.Println("No options found.")
+		return
+	}
+
+	// Group options by expiration date and strike price
+	expirations := make(map[string]map[float64]map[string]tastytrade.EquityOption)
+
+	for _, opt := range options {
+		// Initialize map structure if needed
+		if _, exists := expirations[opt.ExpirationDate]; !exists {
+			expirations[opt.ExpirationDate] = make(map[float64]map[string]tastytrade.EquityOption)
+		}
+
+		if _, exists := expirations[opt.ExpirationDate][opt.StrikePrice]; !exists {
+			expirations[opt.ExpirationDate][opt.StrikePrice] = make(map[string]tastytrade.EquityOption)
+		}
+
+		// Store option by type (call/put)
+		expirations[opt.ExpirationDate][opt.StrikePrice][opt.OptionType] = opt
+	}
+
+	// Print a limited number of expirations
+	maxExpirations := 2
+	expCount := 0
+
+	for exp, strikes := range expirations {
+		if expCount >= maxExpirations {
+			remaining := len(expirations) - maxExpirations
+			if remaining > 0 {
+				fmt.Printf("... and %d more expiration dates\n", remaining)
+			}
+			break
+		}
+
+		fmt.Printf("\nExpiration: %s\n", exp)
+		fmt.Println("-----------------------------------------------------------")
+		fmt.Printf("%-10s %-10s %-25s %-25s\n", "Strike", "", "Call", "Put")
+		fmt.Println("-----------------------------------------------------------")
+
+		// Convert strikes to sorted slice
+		strikeList := make([]float64, 0, len(strikes))
+		for strike := range strikes {
+			strikeList = append(strikeList, strike)
+		}
+
+		// Sort strikes (simple bubble sort for brevity)
+		for i := 0; i < len(strikeList); i++ {
+			for j := i + 1; j < len(strikeList); j++ {
+				if strikeList[i] > strikeList[j] {
+					strikeList[i], strikeList[j] = strikeList[j], strikeList[i]
+				}
+			}
+		}
+
+		// Print options in strike order
+		maxStrikes := 10
+		strikeCount := 0
+
+		for _, strike := range strikeList {
+			if strikeCount >= maxStrikes {
+				remaining := len(strikeList) - maxStrikes
+				if remaining > 0 {
+					fmt.Printf("... and %d more strikes\n", remaining)
+				}
+				break
+			}
+
+			callSymbol := "-"
+			putSymbol := "-"
+
+			if call, exists := strikes[strike]["C"]; exists {
+				callSymbol = call.Symbol
+			}
+
+			if put, exists := strikes[strike]["P"]; exists {
+				putSymbol = put.Symbol
+			}
+
+			fmt.Printf("$%-9.2f %-10s %-25s %-25s\n",
+				strike, "", callSymbol, putSymbol)
+
+			strikeCount++
+		}
+
+		expCount++
+	}
 }
 
 func valueOrEmpty(s string) string {
