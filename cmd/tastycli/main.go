@@ -26,6 +26,11 @@ const (
 	cmdInstrument  = "instrument"
 	cmdOptionChain = "optionchain"
 	cmdExpirations = "expirations"
+
+	// Order-related commands
+	cmdSubmitOrder = "submitorder"
+	cmdDryRunOrder = "dryrunorder"
+	cmdLiveOrders  = "liveorders"
 )
 
 func main() {
@@ -289,6 +294,141 @@ func main() {
 					exp.SettlementType)
 			}
 
+		case cmdLiveOrders:
+			if !checkAuth(isAuthenticated) {
+				continue
+			}
+
+			if len(args) != 2 {
+				fmt.Println("Usage: liveorders <account_number>")
+				continue
+			}
+
+			accountNumber := args[1]
+
+			orders, err := client.GetLiveOrders(ctx, accountNumber)
+			if err != nil {
+				fmt.Printf("Failed to get live orders: %v\n", err)
+				continue
+			}
+			fmt.Printf("Found %d live orders:\n", len(orders))
+			for i, order := range orders {
+				fmt.Printf("\n--- Order %d ---\n", i+1)
+				printOrder(&order)
+			}
+
+		case cmdDryRunOrder:
+			if !checkAuth(isAuthenticated) {
+				continue
+			}
+
+			if len(args) != 2 {
+				fmt.Println("Usage: dryrunorder <account_number>")
+				continue
+			}
+
+			accountNumber := args[1]
+
+			// Guide user through order creation
+			fmt.Println("Creating order for dry run:")
+			orderReq, err := tastytrade.BuildOrderFromUserInput(scanner, accountNumber)
+			if err != nil {
+				fmt.Printf("Failed to create order: %v\n", err)
+				continue
+			}
+
+			// Confirm order details
+			fmt.Println("\nOrder Summary:")
+			printOrderRequest(orderReq)
+
+			fmt.Print("\nProceed with dry run? (y/n): ")
+			if !scanner.Scan() {
+				continue
+			}
+
+			if strings.ToLower(strings.TrimSpace(scanner.Text())) != "y" {
+				fmt.Println("Dry run cancelled.")
+				continue
+			}
+
+			// Perform dry run
+			dryRunResp, err := client.DryRunOrder(ctx, accountNumber, *orderReq)
+			if err != nil {
+				fmt.Printf("Dry run failed: %v\n", err)
+				continue
+			}
+
+			fmt.Println("\nDry Run Results:")
+			fmt.Println("Order Status:", dryRunResp.Data.Order.Status)
+
+			if len(dryRunResp.Data.Warnings) > 0 {
+				fmt.Println("\nWarnings:")
+				for _, warning := range dryRunResp.Data.Warnings {
+					fmt.Printf("- %s (%s)\n", warning.Message, warning.Code)
+				}
+			} else {
+				fmt.Println("No warnings.")
+			}
+
+			fmt.Println("\nBuying Power Effect:")
+			printBuyingPowerEffect(&dryRunResp.Data.BuyingPowerEffect)
+
+			fmt.Println("\nFee Calculation:")
+			printFeeCalculation(&dryRunResp.Data.FeeCalculation)
+
+		case cmdSubmitOrder:
+			if !checkAuth(isAuthenticated) {
+				continue
+			}
+
+			if len(args) != 2 {
+				fmt.Println("Usage: submitorder <account_number>")
+				continue
+			}
+
+			accountNumber := args[1]
+
+			// Guide user through order creation
+			fmt.Println("Creating order for submission:")
+			orderReq, err := tastytrade.BuildOrderFromUserInput(scanner, accountNumber)
+			if err != nil {
+				fmt.Printf("Failed to create order: %v\n", err)
+				continue
+			}
+
+			// Confirm order details
+			fmt.Println("\nOrder Summary:")
+			printOrderRequest(orderReq)
+
+			fmt.Print("\nProceed with order submission? (y/n): ")
+			if !scanner.Scan() {
+				continue
+			}
+
+			if strings.ToLower(strings.TrimSpace(scanner.Text())) != "y" {
+				fmt.Println("Order submission cancelled.")
+				continue
+			}
+
+			// Submit the order
+			orderResp, err := client.SubmitOrder(ctx, accountNumber, *orderReq)
+			if err != nil {
+				fmt.Printf("Order submission failed: %v\n", err)
+				continue
+			}
+
+			fmt.Println("\nOrder Submitted Successfully:")
+			fmt.Printf("Order ID: %d\n", orderResp.Data.Order.ID)
+			fmt.Printf("Status: %s\n", orderResp.Data.Order.Status)
+			fmt.Printf("Received At: %s\n", orderResp.Data.Order.ReceivedAt.Format(time.RFC3339))
+
+			if len(orderResp.Data.Warnings) > 0 {
+				fmt.Println("\nWarnings:")
+				for _, warning := range orderResp.Data.Warnings {
+					fmt.Printf("- %s (%s)\n", warning.Message, warning.Code)
+				}
+			}
+
 		case cmdExit:
 			fmt.Println("Goodbye!")
 			return
@@ -318,6 +458,12 @@ func printHelp(isAuthenticated bool) {
 		fmt.Println("  account <customer_id> <acct#>  - Get specific account details")
 		fmt.Println("  customer <customer_id> [allow-missing] - Get customer details")
 		fmt.Println("  quotetoken                     - Get API quote token")
+
+		// Order management commands
+		fmt.Println("\nOrder Management Commands:")
+		fmt.Println("  liveorders <account_number>     - Get all live orders for account")
+		fmt.Println("  dryrunorder <account_number>    - Test an order without submitting")
+		fmt.Println("  submitorder <account_number>    - Submit an order")
 
 		// Instrument commands help
 		fmt.Println("\nInstrument Commands:")
@@ -391,6 +537,92 @@ func printCustomer(customer *tastytrade.Customer) {
 	}
 
 	fmt.Printf("\nCreated: %s\n", customer.CreatedAt.Format("Jan 2, 2006"))
+}
+
+// Helper functions for printing order-related details
+func printOrder(order *tastytrade.Order) {
+	fmt.Printf("ID: %d\n", order.ID)
+	fmt.Printf("Account: %s\n", order.AccountNumber)
+	fmt.Printf("Status: %s\n", order.Status)
+	if order.ContingentStatus != "" {
+		fmt.Printf("Contingent Status: %s\n", order.ContingentStatus)
+	}
+	fmt.Printf("Type: %s\n", order.OrderType)
+	fmt.Printf("Time in Force: %s\n", order.TimeInForce)
+	if order.UnderlyingSymbol != "" {
+		fmt.Printf("Underlying Symbol: %s\n", order.UnderlyingSymbol)
+	}
+	if order.Price != "" {
+		fmt.Printf("Price: %s (%s)\n", order.Price, order.PriceEffect)
+	}
+	if order.StopTrigger != "" {
+		fmt.Printf("Stop Trigger: %s\n", order.StopTrigger)
+	}
+	fmt.Printf("Cancellable: %v\n", order.Cancellable)
+	fmt.Printf("Editable: %v\n", order.Editable)
+
+	fmt.Println("\nLegs:")
+	for i, leg := range order.Legs {
+		fmt.Printf("  Leg %d: %s %s %d x %s\n",
+			i+1,
+			leg.Action,
+			leg.InstrumentType,
+			leg.Quantity,
+			leg.Symbol)
+
+		if len(leg.Fills) > 0 {
+			fmt.Println("  Fills:")
+			for j, fill := range leg.Fills {
+				fmt.Printf("    Fill %d: %d @ %s (%s)\n",
+					j+1,
+					fill.FillQuantity,
+					fill.FillPrice,
+					fill.FilledAt.Format(time.RFC3339))
+			}
+		}
+	}
+
+	if !order.ReceivedAt.IsZero() {
+		fmt.Printf("\nReceived At: %s\n", order.ReceivedAt.Format(time.RFC3339))
+	}
+}
+
+func printOrderRequest(order *tastytrade.OrderSubmitRequest) {
+	fmt.Printf("Order Type: %s\n", order.OrderType)
+	fmt.Printf("Time in Force: %s\n", order.TimeInForce)
+	if order.Price != "" {
+		fmt.Printf("Price: %s (%s)\n", order.Price, order.PriceEffect)
+	}
+	if order.StopTrigger != "" {
+		fmt.Printf("Stop Trigger: %s\n", order.StopTrigger)
+	}
+
+	fmt.Println("\nLegs:")
+	for i, leg := range order.Legs {
+		fmt.Printf("  Leg %d: %s %s %d x %s\n",
+			i+1,
+			leg.Action,
+			leg.InstrumentType,
+			leg.Quantity,
+			leg.Symbol)
+	}
+}
+
+func printBuyingPowerEffect(bpe *tastytrade.BuyingPowerEffect) {
+	fmt.Printf("Margin Requirement Change: %s %s\n", bpe.ChangeInMarginRequirement, bpe.ChangeInMarginRequirementEffect)
+	fmt.Printf("Buying Power Change: %s %s\n", bpe.ChangeInBuyingPower, bpe.ChangeInBuyingPowerEffect)
+	fmt.Printf("Current Buying Power: %s %s\n", bpe.CurrentBuyingPower, bpe.CurrentBuyingPowerEffect)
+	fmt.Printf("New Buying Power: %s %s\n", bpe.NewBuyingPower, bpe.NewBuyingPowerEffect)
+	if bpe.IsSpread {
+		fmt.Println("Is Spread: Yes")
+	}
+}
+
+func printFeeCalculation(fee *tastytrade.FeeCalculation) {
+	fmt.Printf("Regulatory Fees: %s %s\n", fee.RegulatoryFees, fee.RegulatoryFeesEffect)
+	fmt.Printf("Clearing Fees: %s %s\n", fee.ClearingFees, fee.ClearingFeesEffect)
+	fmt.Printf("Commission: %s %s\n", fee.Commission, fee.CommissionEffect)
+	fmt.Printf("Total Fees: %s %s\n", fee.TotalFees, fee.TotalFeesEffect)
 }
 
 // Helper functions for printing different instrument types
