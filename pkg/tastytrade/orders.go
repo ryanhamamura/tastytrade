@@ -344,3 +344,50 @@ func BuildOrderFromUserInput(scanner *bufio.Scanner, accountNumber string) (*Ord
 
 	return order, nil
 }
+
+func PrintOrder(order *Order) {
+	fmt.Printf("ID: %d\n", order.ID)
+	fmt.Printf("Account: %s\n", order.AccountNumber)
+	fmt.Printf("Status: %s\n", order.Status)
+	if order.ContingentStatus != "" {
+		fmt.Printf("Contingent Status: %s\n", order.ContingentStatus)
+	}
+	fmt.Printf("Type: %s\n", order.OrderType)
+	fmt.Printf("Time in Force: %s\n", order.TimeInForce)
+	if order.UnderlyingSymbol != "" {
+		fmt.Printf("Underlying Symbol: %s\n", order.UnderlyingSymbol)
+	}
+	if order.Price != "" {
+		fmt.Printf("Price: %s (%s)\n", order.Price, order.PriceEffect)
+	}
+	if order.StopTrigger != "" {
+		fmt.Printf("Stop Trigger: %s\n", order.StopTrigger)
+	}
+	fmt.Printf("Cancellable: %v\n", order.Cancellable)
+	fmt.Printf("Editable: %v\n", order.Editable)
+
+	fmt.Println("\nLegs:")
+	for i, leg := range order.Legs {
+		fmt.Printf("  Leg %d: %s %s %d x %s\n",
+			i+1,
+			leg.Action,
+			leg.InstrumentType,
+			leg.Quantity,
+			leg.Symbol)
+
+		if len(leg.Fills) > 0 {
+			fmt.Println("  Fills:")
+			for j, fill := range leg.Fills {
+				fmt.Printf("    Fill %d: %d @ %s (%s)\n",
+					j+1,
+					fill.FillQuantity,
+					fill.FillPrice,
+					fill.FilledAt.Format(time.RFC3339))
+			}
+		}
+	}
+
+	if !order.ReceivedAt.IsZero() {
+		fmt.Printf("\nReceived At: %s\n", order.ReceivedAt.Format(time.RFC3339))
+	}
+}

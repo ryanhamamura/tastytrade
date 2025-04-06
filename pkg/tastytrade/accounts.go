@@ -3,6 +3,7 @@ package tastytrade
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 // GetAPIQuoteTokens retrieves API quote tokens for market data
@@ -70,4 +71,17 @@ func (c *Client) GetCustomer(ctx context.Context, customerID string, allowMissin
 	}
 
 	return &response.Data, nil
+}
+
+func PrintAccount(account *Account) {
+	fmt.Println("Account Details:")
+	fmt.Printf("Account Number: %s\n", account.AccountNumber)
+	fmt.Printf("Type: %s\n", account.AccountTypeName)
+	fmt.Printf("Nickname: %s\n", account.Nickname)
+	fmt.Printf("Margin or Cash: %s\n", account.MarginOrCash)
+	fmt.Printf("Created At: %s\n", account.CreatedAt.Format(time.RFC3339))
+	fmt.Printf("Day Trader Status: %v\n", account.DayTraderStatus)
+	fmt.Printf("Is Closed: %v\n", account.IsClosed)
+	fmt.Printf("Is Futures Approved: %v\n", account.IsFuturesApproved)
+	fmt.Printf("Suitable Options Level: %s\n", account.SuitableOptionsLevel)
 }
