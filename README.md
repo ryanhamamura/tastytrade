@@ -1,14 +1,15 @@
 # TastyTrade Go API Wrapper
 
-A comprehensive, type-safe Go client for the [TastyTrade API](https://developer.tastytrade.com/). This package provides access to TastyTrade's trading platform features, including account management, market data, order placement and management, and streaming services.
+A comprehensive, type-safe Go client for the [TastyTrade API](https://developer.tastytrade.com/). This package provides access to TastyTrade's trading platform features, including account management, market data, order placement and management, and instrument information.
 
 ## Features
 
 - **Type-Safe API**: Strongly-typed structs matching TastyTrade's API responses
 - **Authentication Management**: Built-in token handling with automatic session management
 - **Account Management**: Access to customer and account details
-- **Market Data**: Real-time and delayed quote functionality
-- **Streaming Support**: Tools for real-time data via quote tokens
+- **Market Data**: Instrument data for equities and equity options
+- **Order Management**: Place, modify, and cancel orders
+- **Option Chain Data**: Retrieve option chains, expirations, and strikes
 - **Robust Error Handling**: Detailed error types with response information
 - **Context Support**: All methods accept context for timeout/cancellation
 - **Debug Mode**: Optional detailed logging of API requests and responses
@@ -108,17 +109,87 @@ accounts, err := client.GetCustomerAccounts(ctx, "me")
 account, err := client.GetCustomerAccount(ctx, "me", "your-account-number")
 ```
 
-## Market Data
+## Instruments
 
-Get real-time quotes using quote tokens:
+The package provides methods for retrieving instrument data:
+
+### Equities
 
 ```go
-// Get API quote tokens
-quoteToken, err := client.GetAPIQuoteTokens(ctx)
+// Get a single equity
+equity, err := client.GetEquity(ctx, "AAPL")
 
-// The quote token can be used with streaming services
-fmt.Printf("Quote token: %s\n", quoteToken.Token)
-fmt.Printf("Websocket URL: %s\n", quoteToken.WebsocketURL)
+// Get multiple equities
+equities, err := client.GetEquities(ctx, []string{"AAPL", "MSFT", "GOOG"}, false, false, "")
+
+// Get active equities (paginated)
+equities, pagination, err := client.GetActiveEquities(ctx, "", 1, 50)
+```
+
+### Options
+
+```go
+// Get a single equity option
+option, err := client.GetEquityOption(ctx, "AAPL_012123C100")
+
+// Get multiple equity options
+options, err := client.GetEquityOptions(ctx, []string{"AAPL_012123C100", "AAPL_012123P100"}, true, false)
+
+// Get option chain for a symbol
+chain, err := client.GetOptionChain(ctx, "AAPL")
+
+// Get nested option chain grouped by expiration and strike
+nestedChain, err := client.GetNestedOptionChain(ctx, "AAPL")
+
+// Get compact option chain with symbol lists
+compactChain, err := client.GetCompactOptionChain(ctx, "AAPL")
+
+// Get active expiration dates for a symbol
+expirations, err := client.GetActiveExpirations(ctx, "AAPL")
+```
+
+## Orders
+
+Place and manage orders:
+
+```go
+// Get live orders for an account
+orders, err := client.GetLiveOrders(ctx, "your-account-number")
+
+// Search for orders with filters
+params := map[string]interface{}{
+    "status": "filled",
+    "start-date": time.Now().AddDate(0, -1, 0),
+}
+orders, err := client.SearchOrders(ctx, "your-account-number", params)
+
+// Create an order request
+orderReq := tastytrade.OrderSubmitRequest{
+    TimeInForce: "Day",
+    OrderType:   "Limit",
+    Price:       "150.00",
+    PriceEffect: "Debit",
+    Legs: []tastytrade.OrderLeg{
+        {
+            InstrumentType: "Equity",
+            Symbol:         "AAPL",
+            Quantity:       1,
+            Action:         "Buy to Open",
+        },
+    },
+}
+
+// Validate an order with dry run
+dryRunResp, err := client.DryRunOrder(ctx, "your-account-number", orderReq)
+
+// Submit an order
+orderResp, err := client.SubmitOrder(ctx, "your-account-number", orderReq)
+
+// Cancel an order
+cancelledOrder, err := client.CancelOrder(ctx, "your-account-number", orderId)
+
+// Get a specific order
+order, err := client.GetOrder(ctx, "your-account-number", orderId)
 ```
 
 ## Error Handling
@@ -199,13 +270,26 @@ The repository includes a CLI tool for testing the API:
 go run cmd/tastycli/main.go
 ```
 
-The CLI allows you to:
-- Choose between sandbox and production environments
-- Login with your credentials
-- List accounts
-- Get customer details
-- Retrieve quote tokens
-- And more
+The CLI provides interactive commands for:
+- Choosing between sandbox and production environments
+- Authentication (login/logout)
+- Account and customer information
+- Instrument data (equities, options, option chains)
+- Order management (submit, dry run, search)
+
+## Example Application
+
+A simple example application is included to demonstrate API usage:
+
+```bash
+go run cmd/example/main.go
+```
+
+This example requires a `.env` file with the following variables:
+- USERNAME
+- PASSWORD
+- ACCOUNT_NUMBER
+- ENVIRONMENT (sandbox or production)
 
 ## Package Structure
 
@@ -215,20 +299,26 @@ The package is organized into logical files:
 - `accounts.go`: Account and customer management methods
 - `errors.go`: Error types and handling
 - `models.go`: Shared data models and constants
+- `instrument_models.go`: Data models for instruments
+- `instruments.go`: Methods for retrieving instrument data
+- `order_models.go`: Data models for orders
+- `orders.go`: Methods for order management
 
-## Development and Testing
+## Development Status
 
-### Requirements
+Current implemented features:
+- Authentication (login, logout, token management)
+- Account and customer information
+- Equities and equity option instrument data
+- Option chains, expirations, and strike data
+- Order management (submit, cancel, replace, search)
 
-- Go 1.23.6 or higher
-
-### Testing
-
-Run the tests with:
-
-```bash
-go test ./...
-```
+Planned features:
+- Futures and futures options support
+- Cryptocurrency support
+- Complex order types (OCO, OTO, OTOCO)
+- Warrant instrument support
+- Streaming market data
 
 ## License
 
