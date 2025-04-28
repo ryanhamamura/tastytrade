@@ -130,13 +130,29 @@ func (c *Client) CancelOrder(ctx context.Context, accountNumber string, orderID 
 }
 
 // CancelReplaceOrder cancels and replaces an existing order
+// This function handles the TastyTrade API behavior where cancel-replace:
+// 1. Cancels the original order
+// 2. Creates a new order with the updated parameters
+// 3. Returns a response that doesn't directly include the new order ID
 func (c *Client) CancelReplaceOrder(ctx context.Context, accountNumber string, orderID int64, order OrderSubmitRequest) (*OrderResponse, error) {
 	if err := c.EnsureValidToken(ctx); err != nil {
 		return nil, err
 	}
 
-	endpoint := fmt.Sprintf("/accounts/%s/orders/%d", accountNumber, orderID)
+	// Get original order to check its properties (for later comparison)
+	originalOrder, err := c.GetOrder(ctx, accountNumber, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get original order: %w", err)
+	}
 
+	// Store original legs symbols and quantities for matching
+	originalSymbols := make(map[string]int)
+	for _, leg := range originalOrder.Legs {
+		originalSymbols[leg.Symbol] = leg.Quantity
+	}
+
+	// Send cancel-replace request
+	endpoint := fmt.Sprintf("/accounts/%s/orders/%d", accountNumber, orderID)
 	reqBody, err := json.Marshal(order)
 	if err != nil {
 		return nil, err
@@ -146,6 +162,66 @@ func (c *Client) CancelReplaceOrder(ctx context.Context, accountNumber string, o
 	err = c.doRequest(ctx, "PUT", endpoint, bytes.NewBuffer(reqBody), true, &response)
 	if err != nil {
 		return nil, err
+	}
+
+	// The API doesn't return the new order ID in the response
+	// We need to find the newly created order by checking live orders
+	// Try a few times with increasing delays
+	var liveOrders []Order
+	var listErr error
+	
+	// Try up to 3 times with increasing delays
+	for attempt := 0; attempt < 3; attempt++ {
+		sleepDuration := time.Duration(500*(attempt+1)) * time.Millisecond
+		time.Sleep(sleepDuration)
+		
+		liveOrders, listErr = c.GetLiveOrders(ctx, accountNumber)
+		if listErr == nil && len(liveOrders) > 0 {
+			break
+		}
+	}
+	
+	if listErr != nil {
+		// Don't fail the whole operation, just return the original response
+		return &response, nil
+	}
+
+	// Look for the newly created order with matching characteristics
+	for _, liveOrder := range liveOrders {
+		// Skip the original order or any order that's not in a Received/Working state
+		if liveOrder.ID == orderID || (liveOrder.Status != "Received" && liveOrder.Status != "Working") {
+			continue
+		}
+
+		// Check if it's likely our replacement order:
+		// 1. Should have the new price
+		// 2. Should have the same legs (symbols & quantities)
+		// 3. Should be recently created
+		
+		// Check if price matches our requested price
+		if order.Price != "" && liveOrder.Price != order.Price {
+			continue
+		}
+
+		// Check if the legs match
+		if len(liveOrder.Legs) != len(order.Legs) {
+			continue
+		}
+
+		legMatch := true
+		for _, leg := range liveOrder.Legs {
+			// Check if this leg matches one of our original order legs
+			if requestedQty, exists := originalSymbols[leg.Symbol]; !exists || requestedQty != leg.Quantity {
+				legMatch = false
+				break
+			}
+		}
+
+		if legMatch {
+			// Found our replacement order - update the response
+			response.Data.Order = liveOrder
+			break
+		}
 	}
 
 	return &response, nil
