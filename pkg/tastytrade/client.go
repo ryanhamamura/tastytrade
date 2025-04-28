@@ -447,9 +447,16 @@ func (c *Client) doRequest(ctx context.Context, method, endpoint string, body io
 		return err
 	}
 
-	// Remove leading slash if present to avoid double slashes
-	cleanEndpoint := strings.TrimPrefix(endpoint, "/")
+	// We need to handle query parameters properly
+	endpointParts := strings.SplitN(endpoint, "?", 2)
+	cleanEndpoint := strings.TrimPrefix(endpointParts[0], "/")
 	u.Path = path.Join(u.Path, cleanEndpoint)
+	
+	// If there are query parameters, add them to the URL
+	if len(endpointParts) > 1 {
+		u.RawQuery = endpointParts[1]
+	}
+	
 	fullURL := u.String()
 
 	// Create request with context

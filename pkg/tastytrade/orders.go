@@ -39,6 +39,11 @@ func (c *Client) SearchOrders(ctx context.Context, accountNumber string, params 
 	if len(query) > 0 {
 		endpoint += "?" + query.Encode()
 	}
+	
+	// Debug log the endpoint
+	if c.Debug {
+		fmt.Printf("DEBUG: SearchOrders URL: %s\n", endpoint)
+	}
 
 	var response OrdersResponse
 	err := c.doRequest(ctx, "GET", endpoint, nil, true, &response)
