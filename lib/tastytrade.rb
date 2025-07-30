@@ -11,8 +11,12 @@
 # Always consult with a qualified financial advisor before making investment decisions.
 
 require_relative "tastytrade/version"
+require_relative "tastytrade/client"
 
 module Tastytrade
   class Error < StandardError; end
-  # Your code goes here...
+
+  # API URLs
+  API_URL = "https://api.tastyworks.com"
+  CERT_URL = "https://api.cert.tastyworks.com"
 end
