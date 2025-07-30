@@ -17,12 +17,16 @@ This Ruby gem provides a simple interface to interact with the Tastytrade API, a
 
 ## Features
 
-- 🔐 Secure authentication with Tastytrade API
-- 📊 Real-time market data access
-- 💼 Account management and portfolio tracking
-- 📈 Order placement and management
-- 🔍 Position monitoring
-- 📄 Transaction history
+- Secure authentication with Tastytrade API
+- Real-time market data access
+- Account management and portfolio tracking
+- Order placement and management
+- Position monitoring
+- Transaction history
+
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for the detailed development roadmap. Track progress on our [GitHub Project Board](https://github.com/ryanhamamura/tastytrade/projects).
 
 ## Installation
 
