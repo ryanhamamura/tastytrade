@@ -1,6 +1,6 @@
 # Tastytrade Ruby SDK Roadmap
 
-This document outlines the development roadmap for the unofficial Tastytrade Ruby SDK. Track progress via [GitHub Projects](https://github.com/ryanhamamura/tastytrade/projects).
+This document outlines the development roadmap for the unofficial Tastytrade Ruby SDK. Track progress via [GitHub Projects](https://github.com/users/ryanhamamura/projects/1).
 
 ## Project Goals
 

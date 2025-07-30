@@ -26,7 +26,7 @@ This Ruby gem provides a simple interface to interact with the Tastytrade API, a
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for the detailed development roadmap. Track progress on our [GitHub Project Board](https://github.com/ryanhamamura/tastytrade/projects).
+See [ROADMAP.md](ROADMAP.md) for the detailed development roadmap. Track progress on our [GitHub Project Board](https://github.com/users/ryanhamamura/projects/1).
 
 ## Installation
 
