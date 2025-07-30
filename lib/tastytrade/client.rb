@@ -58,7 +58,10 @@ module Tastytrade
     end
 
     def handle_success(response)
-      parse_json(response.body) if response.body && !response.body.empty?
+      return nil if response.body.nil? || response.body.empty?
+
+      # API returns data in a 'data' field for most endpoints
+      parse_json(response.body)
     end
 
     def handle_error(response)
