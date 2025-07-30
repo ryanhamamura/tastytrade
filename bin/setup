@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
+
+echo "==> Setting up Tastytrade gem development environment..."
+
+# Check Ruby version
+required_ruby=$(grep "required_ruby_version" *.gemspec | grep -o "[0-9.]*")
+current_ruby=$(ruby -v | grep -o "[0-9.]*" | head -1)
+
+echo "==> Checking Ruby version..."
+echo "   Required: >= $required_ruby"
+echo "   Current:  $current_ruby"
+
+# Install dependencies
+echo "==> Installing gem dependencies..."
+bundle install
+
+# Install development tools
+echo "==> Installing development tools..."
+bundle binstubs rspec-core rubocop rake
+
+# Run initial tests to verify setup
+echo "==> Running initial test suite..."
+bundle exec rake spec
+
+# Setup git hooks (optional)
+if [ -d .git ]; then
+  echo "==> Setting up git hooks..."
+  # Add any git hooks here
+fi
+
+echo "==> Setup complete! Run 'bin/console' for an interactive prompt."

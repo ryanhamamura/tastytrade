@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "==> Preparing gem release..."
+
+# Ensure working directory is clean
+if [[ -n $(git status --porcelain) ]]; then
+  echo "ERROR: Working directory is not clean. Commit or stash changes first."
+  exit 1
+fi
+
+# Ensure on main branch
+current_branch=$(git branch --show-current)
+if [[ "$current_branch" != "main" ]]; then
+  echo "ERROR: Must be on main branch to release. Currently on: $current_branch"
+  exit 1
+fi
+
+# Pull latest changes
+echo "==> Pulling latest changes..."
+git pull origin main
+
+# Run tests
+echo "==> Running test suite..."
+bundle exec rake
+
+# Get current version
+current_version=$(ruby -r ./lib/tastytrade/version.rb -e "puts Tastytrade::VERSION")
+echo "Current version: $current_version"
+
+# Prompt for new version
+read -p "Enter new version number: " new_version
+
+# Update version file
+echo "==> Updating version to $new_version..."
+sed -i.bak "s/VERSION = \".*\"/VERSION = \"$new_version\"/" lib/tastytrade/version.rb
+rm lib/tastytrade/version.rb.bak
+
+# Update CHANGELOG
+echo "==> Please update CHANGELOG.md for version $new_version"
+echo "Press enter when done..."
+read
+
+# Commit version bump
+git add lib/tastytrade/version.rb CHANGELOG.md
+git commit -m "Bump version to $new_version"
+
+# Create tag
+git tag -a "v$new_version" -m "Release version $new_version"
+
+# Build and release gem
+echo "==> Building and releasing gem..."
+bundle exec rake release
+
+echo "==> Release complete!"
+echo "Don't forget to:"
+echo "  - Create a GitHub release"
+echo "  - Announce the release"
