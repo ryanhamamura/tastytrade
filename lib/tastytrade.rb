@@ -12,6 +12,8 @@
 
 require_relative "tastytrade/version"
 require_relative "tastytrade/client"
+require_relative "tastytrade/models"
+require_relative "tastytrade/session"
 
 module Tastytrade
   class Error < StandardError; end
