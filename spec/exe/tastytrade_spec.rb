@@ -56,10 +56,9 @@ RSpec.describe "tastytrade executable" do
 
   describe "global options" do
     it "accepts --test flag" do
-      result = run_command("accounts", "--test")
+      result = run_command("help", "--test")
       expect(result[:status].success?).to be true
-      # Currently just placeholder output
-      expect(result[:stdout]).to include("Accounts command not yet implemented")
+      expect(result[:stdout]).to include("Tastytrade commands:")
     end
   end
 
@@ -73,21 +72,33 @@ RSpec.describe "tastytrade executable" do
 
   describe "command stubs" do
     it "has login command" do
-      result = run_command("login")
+      result = run_command("help", "login")
       expect(result[:status].success?).to be true
-      expect(result[:stdout]).to include("Login command not yet implemented")
+      expect(result[:stdout]).to include("Login to Tastytrade")
     end
 
     it "has accounts command" do
-      result = run_command("accounts")
+      result = run_command("help", "accounts")
       expect(result[:status].success?).to be true
-      expect(result[:stdout]).to include("Accounts command not yet implemented")
+      expect(result[:stdout]).to include("List all accounts")
+    end
+
+    it "has select command" do
+      result = run_command("help", "select")
+      expect(result[:status].success?).to be true
+      expect(result[:stdout]).to include("Select an account to use")
+    end
+
+    it "has logout command" do
+      result = run_command("help", "logout")
+      expect(result[:status].success?).to be true
+      expect(result[:stdout]).to include("Logout from Tastytrade")
     end
 
     it "has balance command" do
-      result = run_command("balance")
+      result = run_command("help", "balance")
       expect(result[:status].success?).to be true
-      expect(result[:stdout]).to include("Balance command not yet implemented")
+      expect(result[:stdout]).to include("Display account balance")
     end
   end
 end

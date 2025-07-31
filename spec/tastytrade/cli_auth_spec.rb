@@ -15,6 +15,7 @@ RSpec.describe "Tastytrade::CLI authentication commands" do
     allow(cli).to receive(:prompt).and_return(prompt)
     allow(cli).to receive(:config).and_return(config)
     allow(cli).to receive(:exit) # Prevent actual exit during tests
+    allow(cli).to receive(:interactive_mode) # Mock interactive mode
     allow(Tastytrade::SessionManager).to receive(:new).and_return(session_manager)
     allow(session_manager).to receive(:save_session).and_return(true)
   end
@@ -166,6 +167,14 @@ RSpec.describe "Tastytrade::CLI authentication commands" do
 
         cli.options = { test: false, remember: false }
         expect { cli.login }.to output(/Successfully logged in as test@example.com/).to_stdout
+      end
+
+      it "enters interactive mode after successful login" do
+        allow(config).to receive(:set)
+        expect(cli).to receive(:interactive_mode)
+
+        cli.options = { test: false, remember: false }
+        cli.login
       end
     end
 

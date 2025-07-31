@@ -34,6 +34,10 @@ module Tastytrade
       session = authenticate_user(credentials)
 
       save_user_session(session, credentials, environment)
+
+      # Enter interactive mode after successful login
+      @current_session = session
+      interactive_mode
     rescue Tastytrade::Error => e
       error e.message
       exit 1
@@ -253,6 +257,109 @@ module Tastytrade
     desc "balance", "Display account balance"
     def balance
       puts "Balance command not yet implemented"
+    end
+
+    desc "interactive", "Enter interactive mode"
+    def interactive
+      require_authentication!
+      interactive_mode
+    end
+
+    private
+
+    def interactive_mode
+      info "Welcome to Tastytrade!"
+
+      loop do
+        choice = show_main_menu
+
+        case choice
+        when :accounts
+          interactive_accounts
+        when :select
+          interactive_select
+        when :balance
+          interactive_balance
+        when :portfolio
+          info "Portfolio command not yet implemented"
+        when :positions
+          info "Positions command not yet implemented"
+        when :orders
+          info "Orders command not yet implemented"
+        when :settings
+          info "Settings command not yet implemented"
+        when :exit
+          break
+        end
+      end
+
+      info "Goodbye!"
+    end
+
+    def show_main_menu
+      account_info = current_account_number ? " (Account: #{current_account_number})" : " (No account selected)"
+
+      # Create a fresh prompt instance to avoid event handler accumulation
+      menu_prompt = TTY::Prompt.new
+
+      # Add vim-style navigation
+      menu_prompt.on(:keypress) do |event|
+        case event.value
+        when "j"
+          menu_prompt.trigger(:keydown)
+        when "k"
+          menu_prompt.trigger(:keyup)
+        when "q"
+          return :exit
+        end
+      end
+
+      menu_prompt.select("Main Menu#{account_info}", per_page: 10) do |menu|
+        menu.enum "."  # Enable number shortcuts with . delimiter
+        menu.help "(Use ↑/↓ arrows, vim j/k, or numbers 1-8)"
+
+        menu.choice "Accounts - View all accounts", :accounts
+        menu.choice "Select Account - Choose active account", :select
+        menu.choice "Balance - View account balance", :balance
+        menu.choice "Portfolio - View holdings", :portfolio
+        menu.choice "Positions - View open positions", :positions
+        menu.choice "Orders - View recent orders", :orders
+        menu.choice "Settings - Configure preferences", :settings
+        menu.choice "Exit", :exit
+      end
+    end
+
+    def interactive_accounts
+      accounts = fetch_accounts
+      return if accounts.nil? || accounts.empty?
+
+      display_accounts_table(accounts)
+
+      prompt.keypress("\nPress any key to continue...")
+    rescue Tastytrade::Error => e
+      error "Failed to fetch accounts: #{e.message}"
+      prompt.keypress("\nPress any key to continue...")
+    end
+
+    def interactive_select
+      accounts = fetch_accounts
+      return if accounts.nil? || accounts.empty?
+
+      if accounts.size == 1
+        handle_single_account(accounts)
+      else
+        prompt_for_account_selection(accounts)
+      end
+
+      prompt.keypress("\nPress any key to continue...")
+    rescue Tastytrade::Error => e
+      error "Failed to fetch accounts: #{e.message}"
+      prompt.keypress("\nPress any key to continue...")
+    end
+
+    def interactive_balance
+      info "Balance command not yet implemented"
+      prompt.keypress("\nPress any key to continue...")
     end
   end
 end
