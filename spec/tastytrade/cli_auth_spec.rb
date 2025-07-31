@@ -9,11 +9,14 @@ RSpec.describe "Tastytrade::CLI authentication commands" do
   let(:user) { instance_double(Tastytrade::Models::User, email: "test@example.com") }
   let(:prompt) { instance_double(TTY::Prompt) }
   let(:config) { instance_double(Tastytrade::CLIConfig) }
+  let(:session_manager) { instance_double(Tastytrade::SessionManager) }
 
   before do
     allow(cli).to receive(:prompt).and_return(prompt)
     allow(cli).to receive(:config).and_return(config)
     allow(cli).to receive(:exit) # Prevent actual exit during tests
+    allow(Tastytrade::SessionManager).to receive(:new).and_return(session_manager)
+    allow(session_manager).to receive(:save_session).and_return(true)
   end
 
   describe "#login" do
@@ -23,6 +26,8 @@ RSpec.describe "Tastytrade::CLI authentication commands" do
         allow(Tastytrade::Session).to receive(:new).and_return(session)
         allow(session).to receive(:login).and_return(session)
         allow(session).to receive(:user).and_return(user)
+        allow(session).to receive(:session_token).and_return("test_session_token")
+        allow(session).to receive(:remember_token).and_return("test_remember_token")
         allow(config).to receive(:set)
       end
 
@@ -54,6 +59,8 @@ RSpec.describe "Tastytrade::CLI authentication commands" do
         allow(Tastytrade::Session).to receive(:new).and_return(session)
         allow(session).to receive(:login).and_return(session)
         allow(session).to receive(:user).and_return(user)
+        allow(session).to receive(:session_token).and_return("test_session_token")
+        allow(session).to receive(:remember_token).and_return("test_remember_token")
         allow(config).to receive(:set)
       end
 
@@ -73,6 +80,8 @@ RSpec.describe "Tastytrade::CLI authentication commands" do
         allow(Tastytrade::Session).to receive(:new).and_return(session)
         allow(session).to receive(:login).and_return(session)
         allow(session).to receive(:user).and_return(user)
+        allow(session).to receive(:session_token).and_return("test_session_token")
+        allow(session).to receive(:remember_token).and_return("test_remember_token")
         allow(config).to receive(:set)
       end
 
@@ -89,8 +98,12 @@ RSpec.describe "Tastytrade::CLI authentication commands" do
       end
 
       it "saves sandbox environment to config" do
-        expect(config).to receive(:set).with("environment", "sandbox")
-        
+        # The config is set inside SessionManager#save_session
+        expect(Tastytrade::SessionManager).to receive(:new).with(
+          username: "test@example.com",
+          environment: "sandbox"
+        ).and_return(session_manager)
+
         cli.options = { test: true, remember: false }
         cli.login
       end
@@ -103,6 +116,8 @@ RSpec.describe "Tastytrade::CLI authentication commands" do
         allow(Tastytrade::Session).to receive(:new).and_return(session)
         allow(session).to receive(:login).and_return(session)
         allow(session).to receive(:user).and_return(user)
+        allow(session).to receive(:session_token).and_return("test_session_token")
+        allow(session).to receive(:remember_token).and_return("test_remember_token")
         allow(config).to receive(:set)
       end
 
@@ -126,11 +141,21 @@ RSpec.describe "Tastytrade::CLI authentication commands" do
         allow(Tastytrade::Session).to receive(:new).and_return(session)
         allow(session).to receive(:login).and_return(session)
         allow(session).to receive(:user).and_return(user)
+        allow(session).to receive(:session_token).and_return("test_session_token")
+        allow(session).to receive(:remember_token).and_return("test_remember_token")
       end
 
       it "saves username to config" do
-        expect(config).to receive(:set).with("current_username", "test@example.com")
-        expect(config).to receive(:set).with("environment", "production")
+        # The config is set inside SessionManager#save_session
+        expect(Tastytrade::SessionManager).to receive(:new).with(
+          username: "test@example.com",
+          environment: "production"
+        ).and_return(session_manager)
+        expect(session_manager).to receive(:save_session).with(
+          session,
+          password: "secret123",
+          remember: false
+        ).and_return(true)
 
         cli.options = { test: false, remember: false }
         cli.login
@@ -138,7 +163,7 @@ RSpec.describe "Tastytrade::CLI authentication commands" do
 
       it "displays success message with user email" do
         allow(config).to receive(:set)
-        
+
         cli.options = { test: false, remember: false }
         expect { cli.login }.to output(/Successfully logged in as test@example.com/).to_stdout
       end

@@ -40,10 +40,11 @@ Gem::Specification.new do |spec|
   # Runtime dependencies
   spec.add_dependency "faraday", "~> 2.12"
   spec.add_dependency "faraday-retry", "~> 2.2"
+  spec.add_dependency "keyring", "~> 0.4"
+  spec.add_dependency "pastel", "~> 0.8"
   spec.add_dependency "thor", "~> 1.3"
   spec.add_dependency "tty-prompt", "~> 0.23"
   spec.add_dependency "tty-table", "~> 0.12"
-  spec.add_dependency "pastel", "~> 0.8"
 
   # Development dependencies
   spec.add_development_dependency "bundler-audit", "~> 0.9"

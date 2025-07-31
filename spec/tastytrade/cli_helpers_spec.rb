@@ -66,7 +66,7 @@ RSpec.describe Tastytrade::CLIHelpers do
     end
 
     it "formats large values with commas" do
-      expect(instance.format_currency(1234567.89)).to eq("$1,234,567.89")
+      expect(instance.format_currency(1_234_567.89)).to eq("$1,234,567.89")
     end
   end
 

@@ -96,7 +96,7 @@ RSpec.describe Tastytrade::CLIConfig do
 
     it "saves to file" do
       config.set("test_key", "test_value")
-      
+
       # Load a new config instance to verify persistence
       new_config = described_class.new
       expect(new_config.get("test_key")).to eq("test_value")
@@ -122,7 +122,7 @@ RSpec.describe Tastytrade::CLIConfig do
 
     it "saves changes to file" do
       config.delete("test_key")
-      
+
       new_config = described_class.new
       expect(new_config.get("test_key")).to be_nil
     end
@@ -158,7 +158,7 @@ RSpec.describe Tastytrade::CLIConfig do
 
     it "saves defaults to file" do
       config.reset!
-      
+
       new_config = described_class.new
       expect(new_config.data).to eq(described_class::DEFAULT_CONFIG)
     end
