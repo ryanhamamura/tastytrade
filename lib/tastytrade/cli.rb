@@ -204,28 +204,7 @@ module Tastytrade
       accounts = fetch_accounts
       return if accounts.nil? || accounts.empty?
 
-      if accounts.size == 1
-        config.set("current_account_number", accounts.first.account_number)
-        success "Using account: #{accounts.first.account_number}"
-        return
-      end
-
-      # Build choices for prompt
-      current_account_number = config.get("current_account_number")
-      choices = accounts.map do |account|
-        label = account.account_number.to_s
-        label += " - #{account.nickname}" if account.nickname
-        label += " (#{account.account_type_name})" if account.account_type_name
-        label += " [current]" if account.account_number == current_account_number
-
-        { name: label, value: account.account_number }
-      end
-
-      # Prompt user to select
-      selected = prompt.select("Choose an account:", choices)
-
-      config.set("current_account_number", selected)
-      success "Selected account: #{selected}"
+      handle_single_account(accounts) || prompt_for_account_selection(accounts)
     rescue Tastytrade::Error => e
       error "Failed to fetch accounts: #{e.message}"
       exit 1
@@ -233,6 +212,43 @@ module Tastytrade
       error "Unexpected error: #{e.message}"
       exit 1
     end
+
+    private
+
+    def handle_single_account(accounts)
+      return false unless accounts.size == 1
+
+      config.set("current_account_number", accounts.first.account_number)
+      success "Using account: #{accounts.first.account_number}"
+      true
+    end
+
+    def prompt_for_account_selection(accounts)
+      choices = build_account_choices(accounts)
+      selected = prompt.select("Choose an account:", choices)
+
+      config.set("current_account_number", selected)
+      success "Selected account: #{selected}"
+    end
+
+    def build_account_choices(accounts)
+      current_account_number = config.get("current_account_number")
+
+      accounts.map do |account|
+        label = build_account_label(account, current_account_number)
+        { name: label, value: account.account_number }
+      end
+    end
+
+    def build_account_label(account, current_account_number)
+      label = account.account_number.to_s
+      label += " - #{account.nickname}" if account.nickname
+      label += " (#{account.account_type_name})" if account.account_type_name
+      label += " [current]" if account.account_number == current_account_number
+      label
+    end
+
+    public
 
     desc "balance", "Display account balance"
     def balance

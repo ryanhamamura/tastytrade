@@ -82,7 +82,6 @@ module Tastytrade
     end
 
     # Clear all stored session data
-    # rubocop:disable Naming/PredicateMethod
     def clear_session!
       KeyringStore.delete(token_key)
       KeyringStore.delete(remember_token_key)
@@ -94,7 +93,6 @@ module Tastytrade
 
       true
     end
-    # rubocop:enable Naming/PredicateMethod
 
     # Check if we have stored credentials
     def saved_credentials?
