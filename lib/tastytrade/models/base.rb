@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "time"
+
 module Tastytrade
   module Models
     # Base class for all Tastytrade data models

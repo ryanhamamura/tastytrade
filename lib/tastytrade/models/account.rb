@@ -20,7 +20,7 @@ module Tastytrade
         def get_all(session, include_closed: false)
           params = include_closed ? { "include-closed" => true } : {}
           response = session.get("/customers/me/accounts/", params)
-          response["data"]["items"].map { |item| new(item) }
+          response["data"]["items"].map { |item| new(item["account"]) }
         end
 
         # Get a specific account by account number
