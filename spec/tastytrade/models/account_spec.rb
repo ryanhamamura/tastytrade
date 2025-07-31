@@ -57,8 +57,14 @@ RSpec.describe Tastytrade::Models::Account do
       {
         "data" => {
           "items" => [
-            account_data,
-            account_data.merge("account-number" => "789012")
+            {
+              "account" => account_data,
+              "authority-level" => "owner"
+            },
+            {
+              "account" => account_data.merge("account-number" => "789012"),
+              "authority-level" => "owner"
+            }
           ]
         }
       }
