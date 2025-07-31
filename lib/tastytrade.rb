@@ -18,6 +18,13 @@ require_relative "tastytrade/session"
 module Tastytrade
   class Error < StandardError; end
 
+  # Authentication errors
+  class AuthenticationError < Error; end
+  class SessionExpiredError < AuthenticationError; end
+  class TokenRefreshError < AuthenticationError; end
+  class InvalidCredentialsError < AuthenticationError; end
+  class NetworkTimeoutError < Error; end
+
   # API URLs
   API_URL = "https://api.tastyworks.com"
   CERT_URL = "https://api.cert.tastyworks.com"

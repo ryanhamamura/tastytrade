@@ -76,11 +76,18 @@ RSpec.describe Tastytrade::Client do
   describe "error handling" do
     let(:path) { "/test" }
 
-    it "raises error for 401 response" do
+    it "raises InvalidCredentialsError for 401 response" do
       stub_request(:get, "#{base_url}#{path}")
         .to_return(status: 401, body: '{"error": "Unauthorized"}')
 
-      expect { client.get(path) }.to raise_error(Tastytrade::Error, /Authentication failed/)
+      expect { client.get(path) }.to raise_error(Tastytrade::InvalidCredentialsError, /Authentication failed/)
+    end
+
+    it "raises SessionExpiredError for 403 response" do
+      stub_request(:get, "#{base_url}#{path}")
+        .to_return(status: 403, body: '{"error": "Session expired"}')
+
+      expect { client.get(path) }.to raise_error(Tastytrade::SessionExpiredError, /Session expired or invalid/)
     end
 
     it "raises error for 404 response" do
@@ -155,6 +162,49 @@ RSpec.describe Tastytrade::Client do
         .times(1)
 
       expect { client.post(path) }.to raise_error(Tastytrade::Error, /Server error/)
+    end
+  end
+
+  describe "timeout handling" do
+    let(:path) { "/test" }
+
+    it "raises NetworkTimeoutError on GET timeout" do
+      stub_request(:get, "#{base_url}#{path}")
+        .to_timeout
+
+      expect { client.get(path) }.to raise_error(Tastytrade::NetworkTimeoutError, /Request timed out/)
+    end
+
+    it "raises NetworkTimeoutError on POST timeout" do
+      stub_request(:post, "#{base_url}#{path}")
+        .to_timeout
+
+      expect { client.post(path) }.to raise_error(Tastytrade::NetworkTimeoutError, /Request timed out/)
+    end
+
+    it "raises NetworkTimeoutError on PUT timeout" do
+      stub_request(:put, "#{base_url}#{path}")
+        .to_timeout
+
+      expect { client.put(path) }.to raise_error(Tastytrade::NetworkTimeoutError, /Request timed out/)
+    end
+
+    it "raises NetworkTimeoutError on DELETE timeout" do
+      stub_request(:delete, "#{base_url}#{path}")
+        .to_timeout
+
+      expect { client.delete(path) }.to raise_error(Tastytrade::NetworkTimeoutError, /Request timed out/)
+    end
+  end
+
+  describe "timeout configuration" do
+    it "accepts custom timeout" do
+      custom_client = described_class.new(base_url: base_url, timeout: 60)
+      expect(custom_client.instance_variable_get(:@timeout)).to eq(60)
+    end
+
+    it "uses default timeout when not specified" do
+      expect(client.instance_variable_get(:@timeout)).to eq(Tastytrade::Client::DEFAULT_TIMEOUT)
     end
   end
 end

@@ -26,6 +26,9 @@ module Tastytrade
       # Always save the session token
       save_token(session.session_token)
 
+      # Save session expiration if available
+      save_session_expiration(session.session_expiration) if session.session_expiration
+
       if remember && session.remember_token
         save_remember_token(session.remember_token)
         save_password(password) if password && KeyringStore.available?
@@ -53,6 +56,7 @@ module Tastytrade
       {
         session_token: token,
         remember_token: load_remember_token,
+        session_expiration: load_session_expiration,
         username: username,
         environment: environment
       }
@@ -86,6 +90,7 @@ module Tastytrade
       KeyringStore.delete(token_key)
       KeyringStore.delete(remember_token_key)
       KeyringStore.delete(password_key)
+      KeyringStore.delete(session_expiration_key)
 
       config = CLIConfig.new
       config.delete("current_username")
@@ -113,6 +118,10 @@ module Tastytrade
       "password_#{username}_#{environment}"
     end
 
+    def session_expiration_key
+      "#{SESSION_KEY_PREFIX}_expiration_#{username}_#{environment}"
+    end
+
     def save_token(token)
       KeyringStore.set(token_key, token)
     end
@@ -135,6 +144,17 @@ module Tastytrade
 
     def load_password
       KeyringStore.get(password_key)
+    end
+
+    def save_session_expiration(expiration)
+      KeyringStore.set(session_expiration_key, expiration.iso8601)
+    end
+
+    def load_session_expiration
+      value = KeyringStore.get(session_expiration_key)
+      value ? Time.parse(value).iso8601 : nil
+    rescue StandardError
+      nil
     end
   end
 end

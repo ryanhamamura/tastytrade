@@ -9,28 +9,39 @@ module Tastytrade
   class Client
     attr_reader :base_url
 
-    def initialize(base_url:)
+    DEFAULT_TIMEOUT = 30
+
+    def initialize(base_url:, timeout: DEFAULT_TIMEOUT)
       @base_url = base_url
+      @timeout = timeout
     end
 
     def get(path, params = {}, headers = {})
       response = connection.get(path, params, default_headers.merge(headers))
       handle_response(response)
+    rescue Faraday::ConnectionFailed => e
+      raise Tastytrade::NetworkTimeoutError, "Request timed out: #{e.message}"
     end
 
     def post(path, body = {}, headers = {})
       response = connection.post(path, body.to_json, default_headers.merge(headers))
       handle_response(response)
+    rescue Faraday::ConnectionFailed => e
+      raise Tastytrade::NetworkTimeoutError, "Request timed out: #{e.message}"
     end
 
     def put(path, body = {}, headers = {})
       response = connection.put(path, body.to_json, default_headers.merge(headers))
       handle_response(response)
+    rescue Faraday::ConnectionFailed => e
+      raise Tastytrade::NetworkTimeoutError, "Request timed out: #{e.message}"
     end
 
     def delete(path, headers = {})
       response = connection.delete(path, nil, default_headers.merge(headers))
       handle_response(response)
+    rescue Faraday::ConnectionFailed => e
+      raise Tastytrade::NetworkTimeoutError, "Request timed out: #{e.message}"
     end
 
     private
@@ -40,6 +51,8 @@ module Tastytrade
         faraday.request :retry, max: 2, interval: 0.5,
                                 retry_statuses: [429, 503, 504],
                                 methods: %i[get put delete]
+        faraday.options.timeout = @timeout
+        faraday.options.open_timeout = @timeout
         faraday.adapter Faraday.default_adapter
       end
     end
@@ -65,15 +78,24 @@ module Tastytrade
     end
 
     def handle_error(response)
-      error_message = case response.status
-                      when 401 then "Authentication failed"
-                      when 404 then "Resource not found"
-                      when 400..499 then "Client error"
-                      when 500..599 then "Server error"
-                      else "Unexpected response"
-      end
+      error_details = parse_error_message(response)
 
-      raise Tastytrade::Error, "#{error_message}: #{parse_error_message(response)}"
+      case response.status
+      when 401
+        raise Tastytrade::InvalidCredentialsError, "Authentication failed: #{error_details}"
+      when 403
+        raise Tastytrade::SessionExpiredError, "Session expired or invalid: #{error_details}"
+      when 404
+        raise Tastytrade::Error, "Resource not found: #{error_details}"
+      when 429
+        raise Tastytrade::Error, "Rate limit exceeded: #{error_details}"
+      when 400..499
+        raise Tastytrade::Error, "Client error: #{error_details}"
+      when 500..599
+        raise Tastytrade::Error, "Server error: #{error_details}"
+      else
+        raise Tastytrade::Error, "Unexpected response: #{error_details}"
+      end
     end
 
     def parse_json(body)
