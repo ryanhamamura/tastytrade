@@ -71,7 +71,7 @@ module Tastytrade
                       when 400..499 then "Client error"
                       when 500..599 then "Server error"
                       else "Unexpected response"
-                      end
+      end
 
       raise Tastytrade::Error, "#{error_message}: #{parse_error_message(response)}"
     end

@@ -1,5 +1,5 @@
 AllCops:
-  NewCops: enable
+  DisabledByDefault: true
   TargetRubyVersion: 3.2
   SuggestExtensions: false
   Exclude:
@@ -7,8 +7,9 @@ AllCops:
     - 'vendor/**/*'
     - 'tmp/**/*'
 
-Style/Documentation:
-  Enabled: false
+# Style Rules
+Style/HashSyntax:
+  Enabled: true
 
 Style/StringLiterals:
   Enabled: true
@@ -18,13 +19,83 @@ Style/StringLiteralsInInterpolation:
   Enabled: true
   EnforcedStyle: double_quotes
 
+Style/MultilineIfThen:
+  Enabled: true
+
+Style/MethodDefParentheses:
+  Enabled: true
+
+Style/RedundantReturn:
+  Enabled: true
+
+Style/RedundantSelf:
+  Enabled: true
+
+Style/RedundantInterpolation:
+  Enabled: true
+
+# Layout Rules
 Layout/LineLength:
+  Enabled: true
   Max: 120
 
-Metrics/BlockLength:
-  Exclude:
-    - 'spec/**/*'
-    - '*.gemspec'
+Layout/IndentationWidth:
+  Enabled: true
 
-Gemspec/DevelopmentDependencies:
-  Enabled: false
+Layout/IndentationStyle:
+  Enabled: true
+
+Layout/EmptyLines:
+  Enabled: true
+
+Layout/TrailingEmptyLines:
+  Enabled: true
+
+Layout/TrailingWhitespace:
+  Enabled: true
+
+Layout/SpaceBeforeBlockBraces:
+  Enabled: true
+
+Layout/SpaceInsideBlockBraces:
+  Enabled: true
+
+Layout/SpaceInsideHashLiteralBraces:
+  Enabled: true
+
+Layout/SpaceInsideArrayLiteralBrackets:
+  Enabled: true
+
+Layout/SpaceInsideParens:
+  Enabled: true
+
+Layout/SpaceAroundOperators:
+  Enabled: true
+
+Layout/CaseIndentation:
+  Enabled: true
+
+Layout/EndAlignment:
+  Enabled: true
+  EnforcedStyleAlignWith: variable
+
+Layout/ElseAlignment:
+  Enabled: true
+
+Layout/EmptyLinesAroundClassBody:
+  Enabled: true
+
+Layout/EmptyLinesAroundModuleBody:
+  Enabled: true
+
+Layout/EmptyLinesAroundMethodBody:
+  Enabled: true
+
+Layout/FirstHashElementIndentation:
+  Enabled: true
+
+Layout/HashAlignment:
+  Enabled: true
+
+Layout/MultilineMethodCallIndentation:
+  Enabled: true
