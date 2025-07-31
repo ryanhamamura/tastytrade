@@ -3,3 +3,5 @@
 require_relative "models/base"
 require_relative "models/user"
 require_relative "models/account"
+require_relative "models/account_balance"
+require_relative "models/current_position"

@@ -2,6 +2,7 @@
 
 require "thor"
 require "tty-table"
+require "bigdecimal"
 require_relative "cli_helpers"
 require_relative "cli_config"
 require_relative "session_manager"
@@ -243,11 +244,33 @@ module Tastytrade
 
     private
 
+    def create_vim_prompt
+      menu_prompt = TTY::Prompt.new
+      @exit_requested = false
+
+      # Add vim-style navigation
+      menu_prompt.on(:keypress) do |event|
+        case event.value
+        when "j"
+          menu_prompt.trigger(:keydown)
+        when "k"
+          menu_prompt.trigger(:keyup)
+        when "q", "\e", "\e[" # q or ESC key
+          @exit_requested = true
+          menu_prompt.trigger(:keyenter) # Select current item to exit the menu
+        end
+      end
+
+      menu_prompt
+    end
+
     def handle_single_account(accounts)
       return false unless accounts.size == 1
 
-      config.set("current_account_number", accounts.first.account_number)
-      success "Using account: #{accounts.first.account_number}"
+      account = accounts.first
+      config.set("current_account_number", account.account_number)
+      @current_account = account # Cache the account object
+      success "Using account: #{account.account_number}"
       true
     end
 
@@ -256,6 +279,8 @@ module Tastytrade
       selected = prompt.select("Choose an account:", choices)
 
       config.set("current_account_number", selected)
+      # Cache the selected account object
+      @current_account = accounts.find { |a| a.account_number == selected }
       success "Selected account: #{selected}"
     end
 
@@ -279,8 +304,23 @@ module Tastytrade
     public
 
     desc "balance", "Display account balance"
+    option :all, type: :boolean, desc: "Show balances for all accounts"
     def balance
-      puts "Balance command not yet implemented"
+      require_authentication!
+
+      if options[:all]
+        display_all_account_balances
+      else
+        account = current_account
+        unless account
+          account = select_account_interactively
+          return unless account
+        end
+        display_account_balance(account)
+      end
+    rescue => e
+      error "Failed to fetch balance: #{e.message}"
+      exit 1
     end
 
     desc "status", "Check session status"
@@ -387,24 +427,11 @@ module Tastytrade
     def show_main_menu
       account_info = current_account_number ? " (Account: #{current_account_number})" : " (No account selected)"
 
-      # Create a fresh prompt instance to avoid event handler accumulation
-      menu_prompt = TTY::Prompt.new
+      menu_prompt = create_vim_prompt
 
-      # Add vim-style navigation
-      menu_prompt.on(:keypress) do |event|
-        case event.value
-        when "j"
-          menu_prompt.trigger(:keydown)
-        when "k"
-          menu_prompt.trigger(:keyup)
-        when "q"
-          return :exit
-        end
-      end
-
-      menu_prompt.select("Main Menu#{account_info}", per_page: 10) do |menu|
+      result = menu_prompt.select("Main Menu#{account_info}", per_page: 10) do |menu|
         menu.enum "."  # Enable number shortcuts with . delimiter
-        menu.help "(Use ↑/↓ arrows, vim j/k, or numbers 1-8)"
+        menu.help "(Use ↑/↓ arrows, vim j/k, numbers 1-8, q or ESC to quit)"
 
         menu.choice "Accounts - View all accounts", :accounts
         menu.choice "Select Account - Choose active account", :select
@@ -415,6 +442,12 @@ module Tastytrade
         menu.choice "Settings - Configure preferences", :settings
         menu.choice "Exit", :exit
       end
+
+      # Handle q or ESC key press
+      @exit_requested ? :exit : result
+    rescue Interrupt
+      # Handle Ctrl+C gracefully
+      :exit
     end
 
     def interactive_accounts
@@ -446,8 +479,126 @@ module Tastytrade
     end
 
     def interactive_balance
-      info "Balance command not yet implemented"
+      # Try to use cached account first, only fetch if needed
+      account = @current_account
+
+      # If no cached account, check if we have an account number saved
+      if !account && current_account_number
+        begin
+          account = Tastytrade::Models::Account.get(current_session, current_account_number)
+          @current_account = account # Cache it
+        rescue => e
+          # Don't show error here, will try to select account below
+          account = nil
+        end
+      end
+
+      # If still no account, let user select one
+      account ||= select_account_interactively
+      return unless account
+
+      display_account_balance(account)
+
+      menu_prompt = create_vim_prompt
+
+      action = menu_prompt.select("What would you like to do?", per_page: 10) do |menu|
+        menu.enum "."  # Enable number shortcuts with . delimiter
+        menu.help "(Use ↑/↓ arrows, vim j/k, numbers 1-4, q or ESC to go back)"
+
+        menu.choice "View positions", :positions
+        menu.choice "Switch account", :switch
+        menu.choice "Refresh", :refresh
+        menu.choice "Back to main menu", :back
+      end
+
+      # Handle q or ESC key press
+      return if @exit_requested || action == :back
+
+      case action
+      when :positions
+        info "Positions view not yet implemented"
+        prompt.keypress("\nPress any key to continue...")
+        interactive_balance # Show balance menu again
+      when :switch
+        interactive_select
+        interactive_balance if current_account_number # Check for account number instead of making API call
+      when :refresh
+        @current_account = nil # Clear cache to force refresh
+        interactive_balance
+      end
+    rescue Interrupt
+      # Handle Ctrl+C gracefully - go back to main menu
+      nil
+    rescue => e
+      error "Failed to fetch balance: #{e.message}"
       prompt.keypress("\nPress any key to continue...")
+    end
+
+    def display_account_balance(account)
+      balance = account.get_balances(current_session)
+
+      table = TTY::Table.new(
+        title: "#{account.nickname || account.account_number} - Account Balance",
+        header: ["Metric", "Value"],
+        rows: [
+          ["Cash Balance", format_currency(balance.cash_balance)],
+          ["Net Liquidating Value", format_currency(balance.net_liquidating_value)],
+          ["Equity Buying Power", format_currency(balance.equity_buying_power)],
+          ["Day Trading BP", format_currency(balance.day_trading_buying_power)],
+          ["Available Trading Funds", format_currency(balance.available_trading_funds)],
+          ["BP Usage", "#{balance.buying_power_usage_percentage.to_s("F")}%"]
+        ]
+      )
+
+      puts
+      begin
+        puts table.render(:unicode, padding: [0, 1])
+      rescue StandardError
+        # Fallback for testing or non-TTY environments
+        puts "#{account.nickname || account.account_number} - Account Balance"
+        puts "-" * 50
+        table.rows.each do |row|
+          puts "#{row[0]}: #{row[1]}"
+        end
+      end
+
+      # Add color-coded BP warning if > 80%
+      if balance.high_buying_power_usage?
+        puts
+        warning "High buying power usage: #{balance.buying_power_usage_percentage.to_s("F")}%"
+      end
+    end
+
+    def display_all_account_balances
+      info "Fetching balances for all accounts..."
+      accounts = Tastytrade::Models::Account.get_all(current_session)
+      total_nlv = BigDecimal("0")
+
+      accounts.each do |account|
+        balance = account.get_balances(current_session)
+        total_nlv += balance.net_liquidating_value
+        display_account_balance(account)
+        puts
+      end
+
+      puts
+      info "Total Net Liquidating Value: #{format_currency(total_nlv)}"
+    end
+
+    def select_account_interactively
+      accounts = fetch_accounts
+      return nil if accounts.nil? || accounts.empty?
+
+      if accounts.size == 1
+        accounts.first
+      else
+        choices = accounts.map do |account|
+          label = build_account_label(account, nil)
+          [label, account]
+        end.to_h
+
+        prompt.select("Select an account:", choices)
+      end
     end
   end
 end
