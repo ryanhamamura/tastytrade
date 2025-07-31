@@ -162,4 +162,87 @@ RSpec.describe Tastytrade::CLIHelpers do
       expect(test_class.exit_on_failure?).to be true
     end
   end
+
+  describe "#current_account" do
+    let(:session) { instance_double(Tastytrade::Session) }
+    let(:config) { instance_double(Tastytrade::CLIConfig) }
+    let(:account) do
+      instance_double(Tastytrade::Models::Account,
+                      account_number: "5WX12345",
+                      nickname: "Test Account")
+    end
+
+    before do
+      allow(instance).to receive(:current_session).and_return(session)
+      allow(instance).to receive(:config).and_return(config)
+    end
+
+    context "when account number is saved" do
+      before do
+        allow(config).to receive(:get).with("current_account_number").and_return("5WX12345")
+        allow(Tastytrade::Models::Account).to receive(:get)
+          .with(session, "5WX12345").and_return(account)
+      end
+
+      it "returns the account" do
+        expect(instance.current_account).to eq(account)
+      end
+
+      it "caches the account" do
+        expect(Tastytrade::Models::Account).to receive(:get).once
+        2.times { instance.current_account }
+      end
+    end
+
+    context "when no account number is saved" do
+      before do
+        allow(config).to receive(:get).with("current_account_number").and_return(nil)
+      end
+
+      it "returns nil" do
+        expect(instance.current_account).to be_nil
+      end
+    end
+
+    context "when account fetch fails" do
+      before do
+        allow(config).to receive(:get).with("current_account_number").and_return("5WX12345")
+        allow(Tastytrade::Models::Account).to receive(:get)
+          .and_raise(StandardError, "Network error")
+      end
+
+      it "returns nil" do
+        expect { instance.current_account }.to output(/Failed to load current account/).to_stderr
+        expect(instance.current_account).to be_nil
+      end
+    end
+  end
+
+  describe "#current_account_number" do
+    let(:config) { instance_double(Tastytrade::CLIConfig) }
+
+    before do
+      allow(instance).to receive(:config).and_return(config)
+    end
+
+    context "when account number is saved" do
+      before do
+        allow(config).to receive(:get).with("current_account_number").and_return("5WX12345")
+      end
+
+      it "returns the account number" do
+        expect(instance.current_account_number).to eq("5WX12345")
+      end
+    end
+
+    context "when no account number is saved" do
+      before do
+        allow(config).to receive(:get).with("current_account_number").and_return(nil)
+      end
+
+      it "returns nil" do
+        expect(instance.current_account_number).to be_nil
+      end
+    end
+  end
 end

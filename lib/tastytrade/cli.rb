@@ -197,6 +197,43 @@ module Tastytrade
 
     public
 
+    desc "select", "Select an account to use"
+    def select
+      require_authentication!
+
+      accounts = fetch_accounts
+      return if accounts.nil? || accounts.empty?
+
+      if accounts.size == 1
+        config.set("current_account_number", accounts.first.account_number)
+        success "Using account: #{accounts.first.account_number}"
+        return
+      end
+
+      # Build choices for prompt
+      current_account_number = config.get("current_account_number")
+      choices = accounts.map do |account|
+        label = account.account_number.to_s
+        label += " - #{account.nickname}" if account.nickname
+        label += " (#{account.account_type_name})" if account.account_type_name
+        label += " [current]" if account.account_number == current_account_number
+
+        { name: label, value: account.account_number }
+      end
+
+      # Prompt user to select
+      selected = prompt.select("Choose an account:", choices)
+
+      config.set("current_account_number", selected)
+      success "Selected account: #{selected}"
+    rescue Tastytrade::Error => e
+      error "Failed to fetch accounts: #{e.message}"
+      exit 1
+    rescue StandardError => e
+      error "Unexpected error: #{e.message}"
+      exit 1
+    end
+
     desc "balance", "Display account balance"
     def balance
       puts "Balance command not yet implemented"

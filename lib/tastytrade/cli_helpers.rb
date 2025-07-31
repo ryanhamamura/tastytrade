@@ -97,6 +97,24 @@ module Tastytrade
       exit 1
     end
 
+    # Get the currently selected account
+    def current_account
+      return @current_account if @current_account
+
+      account_number = config.get("current_account_number")
+      return nil unless account_number
+
+      @current_account = Tastytrade::Models::Account.get(current_session, account_number)
+    rescue StandardError => e
+      warn "Failed to load current account: #{e.message}"
+      nil
+    end
+
+    # Get the currently selected account number
+    def current_account_number
+      config.get("current_account_number")
+    end
+
     private
 
     def load_session
