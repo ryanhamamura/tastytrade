@@ -37,18 +37,27 @@ module Tastytrade
       # Get account balances
       #
       # @param session [Tastytrade::Session] Active session
-      # @return [Hash] Account balance data
+      # @return [AccountBalance] Account balance object
       def get_balances(session)
-        session.get("/accounts/#{account_number}/balances/")["data"]
+        response = session.get("/accounts/#{account_number}/balances/")
+        AccountBalance.new(response["data"])
       end
 
       # Get current positions
       #
       # @param session [Tastytrade::Session] Active session
-      # @return [Array<Hash>] Position data
-      def get_positions(session)
-        response = session.get("/accounts/#{account_number}/positions/")
-        response["data"]["items"]
+      # @param symbol [String, nil] Filter by symbol
+      # @param underlying_symbol [String, nil] Filter by underlying symbol
+      # @param include_closed [Boolean] Include closed positions
+      # @return [Array<CurrentPosition>] Position objects
+      def get_positions(session, symbol: nil, underlying_symbol: nil, include_closed: false)
+        params = {}
+        params["symbol"] = symbol if symbol
+        params["underlying-symbol"] = underlying_symbol if underlying_symbol
+        params["include-closed"] = include_closed if include_closed
+
+        response = session.get("/accounts/#{account_number}/positions/", params)
+        response["data"]["items"].map { |item| CurrentPosition.new(item) }
       end
 
       # Get trading status

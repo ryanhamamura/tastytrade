@@ -50,22 +50,122 @@ gem install tastytrade
 
 ## Usage
 
-### Basic Usage
-
-TODO: Add basic usage example
+### Authentication
 
 ```ruby
 require 'tastytrade'
 
-# Basic example
+# Create a session
+session = Tastytrade::Session.new(
+  username: 'your_username',
+  password: 'your_password',
+  remember_me: true  # Optional: enables session refresh with remember token
+)
+
+# Login
+session.login
+
+# Check if authenticated
+session.authenticated? # => true
+
+# Session will automatically refresh when expired if remember_me was enabled
 ```
 
-### Advanced Usage
+### CLI Usage
 
-TODO: Add more complex examples
+The gem includes a command-line interface for common operations:
+
+```bash
+# Login to your account
+tastytrade login
+
+# Login with remember option for automatic session refresh
+tastytrade login --remember
+
+# View account balances
+tastytrade balance
+
+# View balances for all accounts
+tastytrade balance --all
+
+# List all accounts
+tastytrade accounts
+
+# Select an account
+tastytrade select
+
+# Check session status
+tastytrade status
+
+# Refresh session (requires remember token)
+tastytrade refresh
+
+# Logout
+tastytrade logout
+```
+
+### Account Information
 
 ```ruby
-# Advanced example
+# Get all accounts
+accounts = Tastytrade::Models::Account.get_all(session)
+
+# Get specific account
+account = Tastytrade::Models::Account.get(session, 'account_number')
+
+# Check account status
+account.closed? # => false
+account.futures_approved? # => true
+```
+
+### Account Balances
+
+```ruby
+# Get account balance
+balance = account.get_balances(session)
+
+# Access balance information
+balance.cash_balance # => BigDecimal("10000.50")
+balance.net_liquidating_value # => BigDecimal("42001.00")
+balance.equity_buying_power # => BigDecimal("20000.00")
+balance.available_trading_funds # => BigDecimal("12000.00")
+
+# Check buying power usage
+balance.buying_power_usage_percentage # => BigDecimal("40.00")
+balance.high_buying_power_usage? # => false (checks if > 80%)
+
+# Calculate totals
+balance.total_equity_value # => BigDecimal("30001.00")
+balance.total_derivative_value # => BigDecimal("4500.00")
+balance.total_market_value # => BigDecimal("34501.00")
+```
+
+### Positions
+
+```ruby
+# Get all positions
+positions = account.get_positions(session)
+
+# Filter positions
+positions = account.get_positions(session, 
+  symbol: 'AAPL',
+  underlying_symbol: 'AAPL',
+  include_closed: false
+)
+
+# Work with positions
+positions.each do |position|
+  puts position.symbol
+  puts position.quantity
+  puts position.unrealized_pnl
+  puts position.unrealized_pnl_percentage
+  
+  # Check position type
+  position.equity? # => true
+  position.option? # => false
+  position.long? # => true
+  position.short? # => false
+end
 ```
 
 ## Development

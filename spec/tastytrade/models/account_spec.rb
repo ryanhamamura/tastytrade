@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "spec_helper"
+require "bigdecimal"
 
 RSpec.describe Tastytrade::Models::Account do
   let(:account_data) do
@@ -119,9 +120,12 @@ RSpec.describe Tastytrade::Models::Account do
     it "returns balance data" do
       allow(session).to receive(:get).with("/accounts/123456/balances/").and_return(balance_data)
 
-      balances = account.get_balances(session)
+      balance = account.get_balances(session)
 
-      expect(balances).to eq(balance_data["data"])
+      expect(balance).to be_a(Tastytrade::Models::AccountBalance)
+      expect(balance.account_number).to eq("123456")
+      expect(balance.cash_balance).to eq(BigDecimal("10000.00"))
+      expect(balance.net_liquidating_value).to eq(BigDecimal("15000.00"))
     end
   end
 
@@ -138,13 +142,15 @@ RSpec.describe Tastytrade::Models::Account do
     end
 
     it "returns array of positions" do
-      allow(session).to receive(:get).with("/accounts/123456/positions/").and_return(positions_data)
+      allow(session).to receive(:get).with("/accounts/123456/positions/", {}).and_return(positions_data)
 
       positions = account.get_positions(session)
 
       expect(positions).to be_an(Array)
       expect(positions.size).to eq(2)
-      expect(positions.first["symbol"]).to eq("AAPL")
+      expect(positions.first).to be_a(Tastytrade::Models::CurrentPosition)
+      expect(positions.first.symbol).to eq("AAPL")
+      expect(positions.first.quantity).to eq(BigDecimal("100"))
     end
   end
 
