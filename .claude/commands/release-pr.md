@@ -20,7 +20,14 @@ Create a release PR following Ruby gem best practices.
 3. **Update Version**
    - Edit `lib/tastytrade/version.rb` to bump the version number
 
-4. **Update CHANGELOG.md**
+4. **Update ROADMAP.md**
+   - Review the CHANGELOG.md "Unreleased" section for completed items
+   - Find corresponding items in ROADMAP.md and mark them as completed:
+     - Change `- [ ]` to `- [x]` for completed items
+   - Look for items in all phases, not just Phase 1
+   - If an item mentions a GitHub issue number, include "(closes #X)" after marking complete
+
+5. **Update CHANGELOG.md**
    - Move all entries from "Unreleased" to a new version section with today's date
    - Format: `## [X.Y.Z] - YYYY-MM-DD`
    - Create a new empty "Unreleased" section at the top with all subsections:
@@ -46,18 +53,18 @@ Create a release PR following Ruby gem best practices.
      - Nothing yet
      ```
 
-5. **Commit Changes**
+6. **Commit Changes**
    ```bash
-   git add lib/tastytrade/version.rb CHANGELOG.md
+   git add lib/tastytrade/version.rb CHANGELOG.md ROADMAP.md
    git commit -m "Release v<VERSION>"
    ```
 
-6. **Push Branch**
+7. **Push Branch**
    ```bash
    git push -u origin release/v<VERSION>
    ```
 
-7. **Create Pull Request**
+8. **Create Pull Request**
    ```bash
    gh pr create --title "Release v<VERSION>" --body "## Release v<VERSION>
 
@@ -66,10 +73,12 @@ Create a release PR following Ruby gem best practices.
    ### Changes
    - Bumped version to <VERSION>
    - Updated CHANGELOG.md with release date
+   - Updated ROADMAP.md to mark completed items
    
    ### Release Checklist
    - [ ] Version number is correct
    - [ ] CHANGELOG.md is updated with all changes
+   - [ ] ROADMAP.md has completed items marked
    - [ ] All tests pass
    - [ ] RuboCop reports no offenses
    
