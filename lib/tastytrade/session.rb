@@ -5,20 +5,22 @@ require_relative "models"
 module Tastytrade
   # Manages authentication and session state for Tastytrade API
   class Session
-    attr_reader :user, :session_token, :remember_token, :is_test
+    attr_reader :user, :session_token, :remember_token, :is_test, :session_expiration
 
     # Initialize a new session
     #
     # @param username [String] Tastytrade username
-    # @param password [String] Tastytrade password
+    # @param password [String] Tastytrade password (optional if remember_token provided)
     # @param remember_me [Boolean] Whether to save remember token
+    # @param remember_token [String] Existing remember token for re-authentication
     # @param is_test [Boolean] Use test environment
-    def initialize(username:, password:, remember_me: false, is_test: false)
+    def initialize(username:, password: nil, remember_me: false, remember_token: nil, is_test: false, timeout: Client::DEFAULT_TIMEOUT)
       @username = username
       @password = password
       @remember_me = remember_me
+      @remember_token = remember_token
       @is_test = is_test
-      @client = Client.new(base_url: api_url)
+      @client = Client.new(base_url: api_url, timeout: timeout)
     end
 
     # Authenticate with Tastytrade API
@@ -32,6 +34,11 @@ module Tastytrade
       @user = Models::User.new(data["user"])
       @session_token = data["session-token"]
       @remember_token = data["remember-token"] if @remember_me
+
+      # Track session expiration if provided
+      if data["session-expiration"]
+        @session_expiration = Time.parse(data["session-expiration"])
+      end
 
       self
     end
@@ -98,6 +105,34 @@ module Tastytrade
       !@session_token.nil?
     end
 
+    # Check if session is expired
+    #
+    # @return [Boolean] True if session is expired
+    def expired?
+      return false unless @session_expiration
+      Time.now >= @session_expiration
+    end
+
+    # Time remaining until session expires
+    #
+    # @return [Float, nil] Seconds until expiration
+    def time_until_expiry
+      return nil unless @session_expiration
+      @session_expiration - Time.now
+    end
+
+    # Refresh session using remember token
+    #
+    # @return [Session] Self
+    # @raise [Tastytrade::Error] If refresh fails
+    def refresh_session
+      raise Tastytrade::Error, "No remember token available" unless @remember_token
+
+      # Clear password and re-login with remember token
+      @password = nil
+      login
+    end
+
     private
 
     def api_url
@@ -111,11 +146,19 @@ module Tastytrade
     end
 
     def login_credentials
-      {
+      credentials = {
         "login" => @username,
-        "password" => @password,
         "remember-me" => @remember_me
       }
+
+      # Use remember token if available and no password
+      if @remember_token && !@password
+        credentials["remember-token"] = @remember_token
+      else
+        credentials["password"] = @password
+      end
+
+      credentials
     end
   end
 end

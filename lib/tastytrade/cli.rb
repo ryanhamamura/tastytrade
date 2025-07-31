@@ -38,6 +38,17 @@ module Tastytrade
       # Enter interactive mode after successful login
       @current_session = session
       interactive_mode
+    rescue Tastytrade::InvalidCredentialsError => e
+      error "Invalid credentials: #{e.message}"
+      exit 1
+    rescue Tastytrade::SessionExpiredError => e
+      error "Session expired: #{e.message}"
+      info "Please login again"
+      exit 1
+    rescue Tastytrade::NetworkTimeoutError => e
+      error "Network timeout: #{e.message}"
+      info "Check your internet connection and try again"
+      exit 1
     rescue Tastytrade::Error => e
       error e.message
       exit 1
@@ -47,6 +58,19 @@ module Tastytrade
     end
 
     private
+
+    def format_time_remaining(seconds)
+      return "unknown time" unless seconds && seconds > 0
+
+      hours = (seconds / 3600).to_i
+      minutes = ((seconds % 3600) / 60).to_i
+
+      if hours > 0
+        "#{hours}h #{minutes}m"
+      else
+        "#{minutes}m"
+      end
+    end
 
     def login_credentials
       {
@@ -257,6 +281,70 @@ module Tastytrade
     desc "balance", "Display account balance"
     def balance
       puts "Balance command not yet implemented"
+    end
+
+    desc "status", "Check session status"
+    def status
+      session = current_session
+      unless session
+        warning "No active session"
+        info "Run 'tastytrade login' to authenticate"
+        return
+      end
+
+      puts "Session Status:"
+      puts "  User: #{session.user.email}"
+      puts "  Environment: #{config.get("environment") || "production"}"
+
+      if session.session_expiration
+        if session.expired?
+          puts "  Status: #{pastel.red("Expired")}"
+        else
+          time_left = format_time_remaining(session.time_until_expiry)
+          puts "  Status: #{pastel.green("Active")}"
+          puts "  Expires in: #{time_left}"
+        end
+      else
+        puts "  Status: #{pastel.green("Active")}"
+        puts "  Expires in: Unknown"
+      end
+
+      puts "  Remember token: #{session.remember_token ? pastel.green("Available") : pastel.red("Not available")}"
+      puts "  Auto-refresh: #{session.remember_token ? pastel.green("Enabled") : pastel.yellow("Disabled")}"
+    end
+
+    desc "refresh", "Refresh the current session"
+    def refresh
+      session = current_session
+      unless session
+        error "No active session to refresh"
+        exit 1
+      end
+
+      unless session.remember_token
+        error "No remember token available for refresh"
+        info "Login with --remember flag to enable session refresh"
+        exit 1
+      end
+
+      info "Refreshing session..."
+
+      begin
+        session.refresh_session
+
+        # Save refreshed session
+        manager = SessionManager.new(
+          username: session.user.email,
+          environment: config.get("environment") || "production"
+        )
+        manager.save_session(session)
+
+        success "Session refreshed successfully"
+        info "Session expires in #{format_time_remaining(session.time_until_expiry)}" if session.time_until_expiry
+      rescue Tastytrade::TokenRefreshError => e
+        error "Failed to refresh session: #{e.message}"
+        exit 1
+      end
     end
 
     desc "interactive", "Enter interactive mode"

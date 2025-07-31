@@ -38,6 +38,7 @@ RSpec.describe Tastytrade::SessionManager do
     before do
       allow(session).to receive(:session_token).and_return(session_token)
       allow(session).to receive(:remember_token).and_return(remember_token)
+      allow(session).to receive(:session_expiration).and_return(nil)
       allow(Tastytrade::KeyringStore).to receive(:set).and_return(true)
     end
 
@@ -46,6 +47,21 @@ RSpec.describe Tastytrade::SessionManager do
         .with("token_test@example.com_production", session_token)
 
       manager.save_session(session)
+    end
+
+    context "with session expiration" do
+      let(:expiration_time) { Time.now + 3600 }
+
+      before do
+        allow(session).to receive(:session_expiration).and_return(expiration_time)
+      end
+
+      it "saves session expiration" do
+        expect(Tastytrade::KeyringStore).to receive(:set)
+          .with("session_expiration_test@example.com_production", expiration_time.iso8601)
+
+        manager.save_session(session)
+      end
     end
 
     it "saves config data" do
@@ -102,6 +118,8 @@ RSpec.describe Tastytrade::SessionManager do
           .with("token_test@example.com_production").and_return("saved_token")
         allow(Tastytrade::KeyringStore).to receive(:get)
           .with("remember_test@example.com_production").and_return("saved_remember")
+        allow(Tastytrade::KeyringStore).to receive(:get)
+          .with("session_expiration_test@example.com_production").and_return(nil)
       end
 
       it "returns session data hash" do
@@ -110,6 +128,7 @@ RSpec.describe Tastytrade::SessionManager do
         expect(result).to eq({
                                session_token: "saved_token",
                                remember_token: "saved_remember",
+                               session_expiration: nil,
                                username: username,
                                environment: environment
                              })
@@ -225,6 +244,8 @@ RSpec.describe Tastytrade::SessionManager do
         .with("remember_test@example.com_production")
       expect(Tastytrade::KeyringStore).to receive(:delete)
         .with("password_test@example.com_production")
+      expect(Tastytrade::KeyringStore).to receive(:delete)
+        .with("session_expiration_test@example.com_production")
 
       manager.clear_session!
     end

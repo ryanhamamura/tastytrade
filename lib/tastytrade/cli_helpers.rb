@@ -136,18 +136,42 @@ module Tastytrade
         is_test: environment == "sandbox"
       )
 
-      # Set the tokens directly
+      # Set the tokens and expiration directly
       session.instance_variable_set(:@session_token, session_data[:session_token])
       session.instance_variable_set(:@remember_token, session_data[:remember_token])
+      if session_data[:session_expiration]
+        session.instance_variable_set(:@session_expiration, Time.parse(session_data[:session_expiration]))
+      end
 
-      # Validate the session is still active
+      # Check if session needs refresh
+      if session.expired? && session.remember_token
+        info "Session expired, refreshing automatically..."
+        session.refresh_session
+        manager.save_session(session)
+        success "Session refreshed"
+      elsif session.expired?
+        warning "Session expired and no refresh token available"
+        return nil
+      end
+
+      # Final validation
       if session.validate
         session
       else
-        # Session expired, try to restore with saved credentials
-        manager.restore_session
+        # Try one more refresh if we have a remember token
+        if session.remember_token
+          session.refresh_session
+          manager.save_session(session) if session.validate
+          session
+        else
+          nil
+        end
       end
-    rescue StandardError
+    rescue Tastytrade::SessionExpiredError, Tastytrade::AuthenticationError => e
+      warning "Session invalid: #{e.message}"
+      nil
+    rescue StandardError => e
+      error "Failed to load session: #{e.message}"
       nil
     end
   end

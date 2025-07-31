@@ -24,13 +24,27 @@ RSpec.describe Tastytrade::Session do
       session = described_class.new(username: username, password: password, is_test: true)
 
       expect(session.is_test).to be true
-      expect(Tastytrade::Client).to have_received(:new).with(base_url: Tastytrade::CERT_URL)
+      expect(Tastytrade::Client).to have_received(:new).with(base_url: Tastytrade::CERT_URL, timeout: 30)
     end
 
     it "creates session with remember_me" do
       session = described_class.new(username: username, password: password, remember_me: true)
 
       expect(session.remember_token).to be_nil # Not set until login
+    end
+
+    it "creates session with remember_token" do
+      remember_token = "existing-remember-token"
+      session = described_class.new(username: username, remember_token: remember_token)
+
+      expect(session.remember_token).to eq(remember_token)
+      expect(session.instance_variable_get(:@password)).to be_nil
+    end
+
+    it "creates session with timeout" do
+      session = described_class.new(username: username, password: password, timeout: 60)
+
+      expect(Tastytrade::Client).to have_received(:new).with(base_url: Tastytrade::API_URL, timeout: 60)
     end
   end
 
@@ -82,6 +96,49 @@ RSpec.describe Tastytrade::Session do
         session.login
 
         expect(session.remember_token).to eq("test-remember-token")
+      end
+    end
+
+    context "with remember_token authentication" do
+      let(:remember_token) { "existing-remember-token" }
+      let(:session) { described_class.new(username: username, remember_token: remember_token) }
+
+      it "authenticates using remember token" do
+        expect(client).to receive(:post).with("/sessions", {
+                                                "login" => username,
+                                                "remember-token" => remember_token,
+                                                "remember-me" => false
+                                              }).and_return(login_response)
+
+        session.login
+
+        expect(session.session_token).to eq("test-session-token")
+      end
+
+      it "does not send password when using remember token" do
+        expect(client).to receive(:post) do |_path, body|
+          expect(body).not_to have_key("password")
+          login_response
+        end
+
+        session.login
+      end
+    end
+
+    context "with session expiration" do
+      let(:login_response_with_expiration) do
+        login_response.tap do |response|
+          response["data"]["session-expiration"] = "2024-01-01T12:00:00Z"
+        end
+      end
+
+      it "parses and stores session expiration" do
+        expect(client).to receive(:post).and_return(login_response_with_expiration)
+
+        session.login
+
+        expect(session.session_expiration).to be_a(Time)
+        expect(session.session_expiration.iso8601).to eq("2024-01-01T12:00:00Z")
       end
     end
   end
@@ -231,6 +288,105 @@ RSpec.describe Tastytrade::Session do
     it "returns true when session token exists" do
       session.instance_variable_set(:@session_token, "token")
       expect(session.authenticated?).to be true
+    end
+  end
+
+  describe "#expired?" do
+    let(:session) { described_class.new(username: username, password: password) }
+
+    it "returns false when no expiration is set" do
+      expect(session.expired?).to be false
+    end
+
+    it "returns false when session is not expired" do
+      future_time = Time.now + 3600 # 1 hour from now
+      session.instance_variable_set(:@session_expiration, future_time)
+
+      expect(session.expired?).to be false
+    end
+
+    it "returns true when session is expired" do
+      past_time = Time.now - 3600 # 1 hour ago
+      session.instance_variable_set(:@session_expiration, past_time)
+
+      expect(session.expired?).to be true
+    end
+  end
+
+  describe "#time_until_expiry" do
+    let(:session) { described_class.new(username: username, password: password) }
+
+    it "returns nil when no expiration is set" do
+      expect(session.time_until_expiry).to be_nil
+    end
+
+    it "returns positive seconds when session is not expired" do
+      future_time = Time.now + 3600 # 1 hour from now
+      session.instance_variable_set(:@session_expiration, future_time)
+
+      time_left = session.time_until_expiry
+      expect(time_left).to be > 3590 # Allow for small time difference
+      expect(time_left).to be <= 3600
+    end
+
+    it "returns negative seconds when session is expired" do
+      past_time = Time.now - 3600 # 1 hour ago
+      session.instance_variable_set(:@session_expiration, past_time)
+
+      time_left = session.time_until_expiry
+      expect(time_left).to be < -3590
+      expect(time_left).to be >= -3610 # Allow for small timing differences
+    end
+  end
+
+  describe "#refresh_session" do
+    let(:session) { described_class.new(username: username, password: password, remember_me: true) }
+    let(:refresh_response) do
+      {
+        "data" => {
+          "user" => {
+            "email" => "test@example.com",
+            "username" => "testuser"
+          },
+          "session-token" => "new-session-token",
+          "session-expiration" => "2024-01-01T12:00:00Z"
+        }
+      }
+    end
+
+    context "with remember token" do
+      before do
+        session.instance_variable_set(:@remember_token, "valid-remember-token")
+      end
+
+      it "refreshes session using remember token" do
+        expect(client).to receive(:post).with("/sessions", {
+                                                "login" => username,
+                                                "remember-token" => "valid-remember-token",
+                                                "remember-me" => true
+                                              }).and_return(refresh_response)
+
+        result = session.refresh_session
+
+        expect(result).to eq(session)
+        expect(session.session_token).to eq("new-session-token")
+        expect(session.instance_variable_get(:@password)).to be_nil
+      end
+
+      it "updates session expiration on refresh" do
+        expect(client).to receive(:post).and_return(refresh_response)
+
+        session.refresh_session
+
+        expect(session.session_expiration).to be_a(Time)
+        expect(session.session_expiration.iso8601).to eq("2024-01-01T12:00:00Z")
+      end
+    end
+
+    context "without remember token" do
+      it "raises error when no remember token available" do
+        expect { session.refresh_session }.to raise_error(Tastytrade::Error, "No remember token available")
+      end
     end
   end
 end
