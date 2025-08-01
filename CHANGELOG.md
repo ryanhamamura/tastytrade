@@ -71,6 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Account.get_positions now returns array of CurrentPosition objects instead of raw hashes
 - CLI menus now use consistent vim-style navigation with extracted helper method
 - Updated release-pr Claude Code command to include ROADMAP.md updates in release process
+- Removed MFA requirement for RubyGems.org publishing
+- Updated release-pr command to reflect that rake release auto-creates git tags
 
 ### Fixed
 - Account data parsing from API response (#25)
