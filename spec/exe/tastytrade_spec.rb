@@ -74,7 +74,7 @@ RSpec.describe "tastytrade executable" do
     it "has login command" do
       result = run_command("help", "login")
       expect(result[:status].success?).to be true
-      expect(result[:stdout]).to include("Login to Tastytrade")
+      expect(result[:stdout]).to include("Login to your Tastytrade account")
     end
 
     it "has accounts command" do

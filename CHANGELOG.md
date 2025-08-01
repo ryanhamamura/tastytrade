@@ -8,18 +8,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Nothing yet
+- CLI positions command (#7)
+  - `positions` command to display account positions in table format
+  - Position filtering options: --symbol, --underlying-symbol, --include-closed
+  - Account selection with --account option
+  - Color-coded P/L display (green for profit, red for loss)
+  - Summary statistics showing total P/L and winners/losers count
+  - Option-specific display formatting (e.g., "AAPL 150C 1/19")
+  - Support for short positions with negative quantity display
+  - Integration with interactive mode and balance submenu
+- Positions formatter for table display
+  - TTY::Table integration for professional formatting
+  - BigDecimal precision for monetary values
+  - Automatic symbol formatting for options
+  - Summary row with position statistics
+- Environment variable authentication support
+  - Session.from_environment class method for creating sessions from env vars
+  - Support for TASTYTRADE_USERNAME, TASTYTRADE_PASSWORD (or TT_ prefixed)
+  - Optional TASTYTRADE_ENVIRONMENT for sandbox/production selection
+  - Optional TASTYTRADE_REMEMBER for automatic session refresh
+  - CLI automatically attempts env var login before prompting
+  - Fallback to interactive login if env var authentication fails
+  - Complete test coverage for all environment variable scenarios
+- Enhanced CLI documentation
+  - Comprehensive login command help with environment variable examples
+  - README documentation for environment variable configuration
+  - Examples for CI/CD and automation use cases
+- CLI login improvements
+  - Added --no-interactive flag to skip interactive mode after login
+  - Useful for scripting and CI/CD environments
+  - Correctly detects environment (sandbox/production) from env vars
+- GitHub Release creation instructions in release workflow
+  - Added `gh release create` command to release-pr.md
+  - Automated release notes generation with --generate-notes flag
+  - Draft release workflow for review before publishing
 
 ### Changed
-- Nothing yet
-
-### Deprecated
-- Nothing yet
-
-### Removed
-- Nothing yet
+- Session storage switched from keyring to secure file-based storage
+  - Sessions now stored in ~/.config/tastytrade/credentials/ with 0600 permissions
+  - More reliable across different systems without keyring dependencies
+  - Credentials directory created with 0700 permissions for security
+  - User data (email, username, external_id) now saved with sessions for validation
 
 ### Fixed
+- Session persistence issues between command invocations
+  - Fixed session corruption after first command execution
+  - Sessions now properly persist across multiple CLI commands
+  - Removed problematic session validation on load that was causing failures
+- Removed stray error message "Failed to load current account" from positions/balance commands
+  - Error now only displays when DEBUG_SESSION environment variable is set
+- Fixed all test failures related to file-based storage implementation
+  - Updated FileStore tests to properly mock temporary directories
+  - Fixed CLI auth tests to stub environment variable checks
+  - Added missing user attributes to test mocks
+  - Updated session manager tests for new user data saving/loading
+
+### Removed
+- Keyring gem dependency and KeyringStore implementation
+  - Replaced with more reliable file-based credential storage
+  - Eliminates cross-platform keyring compatibility issues
+
+### Deprecated
 - Nothing yet
 
 ### Security

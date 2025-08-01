@@ -86,6 +86,18 @@ Create a release PR following Ruby gem best practices.
    After merging this PR:
    1. \`git checkout main && git pull\`
    2. \`bundle exec rake release\`
+   3. Create a GitHub Release:
+      \`\`\`bash
+      gh release create v<VERSION> \\
+        --title "v<VERSION>" \\
+        --generate-notes \\
+        --draft
+      \`\`\`
+   4. Edit the draft release to add a summary section at the top with key highlights
+   5. Publish the release:
+      \`\`\`bash
+      gh release edit v<VERSION> --draft=false
+      \`\`\`
    
    Note: The rake release command will automatically create and push the git tag v<VERSION>"
    ```

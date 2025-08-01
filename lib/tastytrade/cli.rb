@@ -25,20 +25,65 @@ module Tastytrade
     end
 
     desc "login", "Login to Tastytrade"
+    long_desc <<-LONGDESC
+    Login to your Tastytrade account.#{" "}
+
+    Credentials can be provided via:
+    - Environment variables: TASTYTRADE_USERNAME, TASTYTRADE_PASSWORD (or TT_USERNAME, TT_PASSWORD)
+    - Command line option: --username (password will be prompted)
+    - Interactive prompts (default)
+
+    Optional environment variables:
+    - TASTYTRADE_ENVIRONMENT=sandbox (or TT_ENVIRONMENT) for test environment
+    - TASTYTRADE_REMEMBER=true (or TT_REMEMBER) to save session for auto-refresh
+
+    Examples:
+      $ tastytrade login
+      $ tastytrade login --username user@example.com
+      $ tastytrade login --no-interactive  # Skip interactive mode
+      $ TASTYTRADE_USERNAME=user@example.com TASTYTRADE_PASSWORD=pass tastytrade login --no-interactive
+    LONGDESC
     option :username, aliases: "-u", desc: "Username"
     option :remember, aliases: "-r", type: :boolean, default: false, desc: "Remember credentials"
+    option :no_interactive, type: :boolean, default: false, desc: "Skip interactive mode after login"
     def login
-      credentials = login_credentials
-      environment = options[:test] ? "sandbox" : "production"
+      # Try environment variables first
+      if (session = Session.from_environment)
+        environment = session.instance_variable_get(:@is_test) ? "sandbox" : "production"
+        info "Using credentials from environment variables..."
+        info "Logging in to #{environment} environment..."
 
+        begin
+          session.login
+          success "Successfully logged in as #{session.user.email}"
+
+          save_user_session(session, {
+                              username: session.user.email,
+                              remember: session.remember_token ? true : false
+                            }, environment)
+
+          @current_session = session
+          interactive_mode unless options[:no_interactive]
+          return
+        rescue Tastytrade::Error => e
+          error "Environment variable login failed: #{e.message}"
+          info "Falling back to interactive login..."
+        end
+      end
+
+      # Fall back to interactive login
+      environment = options[:test] ? "sandbox" : "production"
+      credentials = login_credentials
       info "Logging in to #{environment} environment..."
       session = authenticate_user(credentials)
 
-      save_user_session(session, credentials, environment)
+      # Update credentials with actual email from session
+      credentials_with_email = credentials.merge(username: session.user.email)
+      save_user_session(session, credentials_with_email, environment)
 
-      # Enter interactive mode after successful login
+      # Enter interactive mode after successful login (unless --no-interactive)
       @current_session = session
-      interactive_mode
+      interactive_mode unless options[:no_interactive]
     rescue Tastytrade::InvalidCredentialsError => e
       error "Invalid credentials: #{e.message}"
       exit 1
@@ -99,8 +144,13 @@ module Tastytrade
         environment: environment
       )
 
+      # Save the configuration first
+      config.set("current_username", credentials[:username])
+      config.set("environment", environment)
+      config.set("last_login", Time.now.to_s)
+
       if manager.save_session(session, password: credentials[:password], remember: credentials[:remember])
-        info "Session saved securely" if credentials[:remember]
+        info "Session saved securely"
       else
         warning "Failed to save session credentials"
       end
@@ -323,6 +373,66 @@ module Tastytrade
       exit 1
     end
 
+    desc "positions", "Display account positions"
+    option :account, type: :string, desc: "Account number (uses default if not specified)"
+    option :symbol, type: :string, desc: "Filter by symbol"
+    option :underlying_symbol, type: :string, desc: "Filter by underlying symbol"
+    option :include_closed, type: :boolean, default: false, desc: "Include closed positions"
+    # Display account positions with optional filtering
+    #
+    # @example Display all open positions
+    #   tastytrade positions
+    #
+    # @example Display positions for a specific symbol
+    #   tastytrade positions --symbol AAPL
+    #
+    # @example Display option positions for an underlying symbol
+    #   tastytrade positions --underlying-symbol SPY
+    #
+    # @example Include closed positions
+    #   tastytrade positions --include-closed
+    #
+    # @example Display positions for a specific account
+    #   tastytrade positions --account 5WX12345
+    #
+    def positions
+      require_authentication!
+
+      # Get the account to use
+      account = if options[:account]
+        Tastytrade::Models::Account.get(current_session, options[:account])
+      else
+        current_account || select_account_interactively
+      end
+
+      return unless account
+
+      info "Fetching positions for account #{account.account_number}..."
+
+      # Fetch positions with filters
+      positions = account.get_positions(
+        current_session,
+        symbol: options[:symbol],
+        underlying_symbol: options[:underlying_symbol],
+        include_closed: options[:include_closed]
+      )
+
+      if positions.empty?
+        warning "No positions found"
+        return
+      end
+
+      # Display positions using formatter
+      formatter = Tastytrade::PositionsFormatter.new(pastel: pastel)
+      formatter.format_table(positions)
+    rescue Tastytrade::Error => e
+      error "Failed to fetch positions: #{e.message}"
+      exit 1
+    rescue StandardError => e
+      error "Unexpected error: #{e.message}"
+      exit 1
+    end
+
     desc "status", "Check session status"
     def status
       session = current_session
@@ -411,7 +521,7 @@ module Tastytrade
         when :portfolio
           info "Portfolio command not yet implemented"
         when :positions
-          info "Positions command not yet implemented"
+          interactive_positions
         when :orders
           info "Orders command not yet implemented"
         when :settings
@@ -516,9 +626,7 @@ module Tastytrade
 
       case action
       when :positions
-        info "Positions view not yet implemented"
-        prompt.keypress("\nPress any key to continue...")
-        interactive_balance # Show balance menu again
+        interactive_positions
       when :switch
         interactive_select
         interactive_balance if current_account_number # Check for account number instead of making API call
@@ -600,5 +708,34 @@ module Tastytrade
         prompt.select("Select an account:", choices)
       end
     end
+
+    def interactive_positions
+      account = @current_account || current_account || select_account_interactively
+      return unless account
+
+      info "Fetching positions for account #{account.account_number}..."
+
+      positions = account.get_positions(current_session)
+
+      if positions.empty?
+        warning "No positions found"
+        prompt.keypress("\nPress any key to continue...")
+        return
+      end
+
+      formatter = Tastytrade::PositionsFormatter.new(pastel: pastel)
+      formatter.format_table(positions)
+
+      prompt.keypress("\nPress any key to continue...")
+    rescue Tastytrade::Error => e
+      error "Failed to fetch positions: #{e.message}"
+      prompt.keypress("\nPress any key to continue...")
+    rescue StandardError => e
+      error "Unexpected error: #{e.message}"
+      prompt.keypress("\nPress any key to continue...")
+    end
   end
 end
+
+# Require after CLI class is defined to avoid module/class conflict
+require_relative "cli/positions_formatter"

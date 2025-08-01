@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-require_relative "keyring_store"
+require_relative "file_store"
+require_relative "cli_config"
 require "json"
 
 module Tastytrade
@@ -29,9 +30,12 @@ module Tastytrade
       # Save session expiration if available
       save_session_expiration(session.session_expiration) if session.session_expiration
 
+      # Save user data
+      save_user_data(session.user) if session.user
+
       if remember && session.remember_token
         save_remember_token(session.remember_token)
-        save_password(password) if password && KeyringStore.available?
+        save_password(password) if password && FileStore.available?
       end
 
       # Save session metadata
@@ -56,6 +60,7 @@ module Tastytrade
       {
         session_token: token,
         remember_token: load_remember_token,
+        user_data: load_user_data,
         session_expiration: load_session_expiration,
         username: username,
         environment: environment
@@ -87,10 +92,10 @@ module Tastytrade
 
     # Clear all stored session data
     def clear_session!
-      KeyringStore.delete(token_key)
-      KeyringStore.delete(remember_token_key)
-      KeyringStore.delete(password_key)
-      KeyringStore.delete(session_expiration_key)
+      FileStore.delete(token_key)
+      FileStore.delete(remember_token_key)
+      FileStore.delete(password_key)
+      FileStore.delete(session_expiration_key)
 
       config = CLIConfig.new
       config.delete("current_username")
@@ -122,37 +127,61 @@ module Tastytrade
       "#{SESSION_KEY_PREFIX}_expiration_#{username}_#{environment}"
     end
 
+    def user_data_key
+      "user_data_#{username}_#{environment}"
+    end
+
     def save_token(token)
-      KeyringStore.set(token_key, token)
+      result = FileStore.set(token_key, token)
+      result
     end
 
     def load_token
-      KeyringStore.get(token_key)
+      FileStore.get(token_key)
     end
 
     def save_remember_token(token)
-      KeyringStore.set(remember_token_key, token)
+      FileStore.set(remember_token_key, token)
     end
 
     def load_remember_token
-      KeyringStore.get(remember_token_key)
+      FileStore.get(remember_token_key)
     end
 
     def save_password(password)
-      KeyringStore.set(password_key, password)
+      FileStore.set(password_key, password)
     end
 
     def load_password
-      KeyringStore.get(password_key)
+      FileStore.get(password_key)
     end
 
     def save_session_expiration(expiration)
-      KeyringStore.set(session_expiration_key, expiration.iso8601)
+      FileStore.set(session_expiration_key, expiration.iso8601)
     end
 
     def load_session_expiration
-      value = KeyringStore.get(session_expiration_key)
+      value = FileStore.get(session_expiration_key)
       value ? Time.parse(value).iso8601 : nil
+    rescue StandardError
+      nil
+    end
+
+    def save_user_data(user)
+      return unless user
+      # Save minimal user data needed for session validation
+      user_data = {
+        email: user.email,
+        username: user.username,
+        external_id: user.external_id
+      }
+      FileStore.set(user_data_key, JSON.generate(user_data))
+    end
+
+    def load_user_data
+      data = FileStore.get(user_data_key)
+      return nil unless data
+      JSON.parse(data)
     rescue StandardError
       nil
     end

@@ -2,7 +2,7 @@
 
 require "spec_helper"
 require "tastytrade/session_manager"
-require "tastytrade/keyring_store"
+require "tastytrade/file_store"
 require "tastytrade/cli_config"
 
 RSpec.describe Tastytrade::SessionManager do
@@ -16,7 +16,7 @@ RSpec.describe Tastytrade::SessionManager do
     allow(Tastytrade::CLIConfig).to receive(:new).and_return(config)
     allow(config).to receive(:set)
     allow(config).to receive(:delete)
-    allow(Tastytrade::KeyringStore).to receive(:available?).and_return(true)
+    allow(Tastytrade::FileStore).to receive(:available?).and_return(true)
   end
 
   describe "#initialize" do
@@ -34,16 +34,21 @@ RSpec.describe Tastytrade::SessionManager do
   describe "#save_session" do
     let(:session_token) { "session_token_123" }
     let(:remember_token) { "remember_token_456" }
+    let(:user) { instance_double(Tastytrade::Models::User,
+                                email: "test@example.com",
+                                username: "testuser",
+                                external_id: "test-external-id") }
 
     before do
       allow(session).to receive(:session_token).and_return(session_token)
       allow(session).to receive(:remember_token).and_return(remember_token)
       allow(session).to receive(:session_expiration).and_return(nil)
-      allow(Tastytrade::KeyringStore).to receive(:set).and_return(true)
+      allow(session).to receive(:user).and_return(user)
+      allow(Tastytrade::FileStore).to receive(:set).and_return(true)
     end
 
     it "saves session token" do
-      expect(Tastytrade::KeyringStore).to receive(:set)
+      expect(Tastytrade::FileStore).to receive(:set)
         .with("token_test@example.com_production", session_token)
 
       manager.save_session(session)
@@ -57,7 +62,7 @@ RSpec.describe Tastytrade::SessionManager do
       end
 
       it "saves session expiration" do
-        expect(Tastytrade::KeyringStore).to receive(:set)
+        expect(Tastytrade::FileStore).to receive(:set)
           .with("session_expiration_test@example.com_production", expiration_time.iso8601)
 
         manager.save_session(session)
@@ -74,18 +79,18 @@ RSpec.describe Tastytrade::SessionManager do
 
     context "with remember option" do
       it "saves remember token and password" do
-        expect(Tastytrade::KeyringStore).to receive(:set)
+        expect(Tastytrade::FileStore).to receive(:set)
           .with("remember_test@example.com_production", remember_token)
-        expect(Tastytrade::KeyringStore).to receive(:set)
+        expect(Tastytrade::FileStore).to receive(:set)
           .with("password_test@example.com_production", "secret123")
 
         manager.save_session(session, password: "secret123", remember: true)
       end
 
       it "doesn't save password if keyring unavailable" do
-        allow(Tastytrade::KeyringStore).to receive(:available?).and_return(false)
+        allow(Tastytrade::FileStore).to receive(:available?).and_return(false)
 
-        expect(Tastytrade::KeyringStore).not_to receive(:set)
+        expect(Tastytrade::FileStore).not_to receive(:set)
           .with("password_test@example.com_production", anything)
 
         manager.save_session(session, password: "secret123", remember: true)
@@ -94,9 +99,9 @@ RSpec.describe Tastytrade::SessionManager do
 
     context "without remember option" do
       it "doesn't save remember token or password" do
-        expect(Tastytrade::KeyringStore).not_to receive(:set)
+        expect(Tastytrade::FileStore).not_to receive(:set)
           .with("remember_test@example.com_production", anything)
-        expect(Tastytrade::KeyringStore).not_to receive(:set)
+        expect(Tastytrade::FileStore).not_to receive(:set)
           .with("password_test@example.com_production", anything)
 
         manager.save_session(session, password: "secret123", remember: false)
@@ -104,7 +109,7 @@ RSpec.describe Tastytrade::SessionManager do
     end
 
     it "handles errors gracefully" do
-      allow(Tastytrade::KeyringStore).to receive(:set).and_raise(StandardError, "Save error")
+      allow(Tastytrade::FileStore).to receive(:set).and_raise(StandardError, "Save error")
 
       expect { manager.save_session(session) }.to output(/Failed to save session/).to_stderr
       expect(manager.save_session(session)).to be false
@@ -114,11 +119,14 @@ RSpec.describe Tastytrade::SessionManager do
   describe "#load_session" do
     context "with saved token" do
       before do
-        allow(Tastytrade::KeyringStore).to receive(:get)
+        allow(Tastytrade::FileStore).to receive(:get)
           .with("token_test@example.com_production").and_return("saved_token")
-        allow(Tastytrade::KeyringStore).to receive(:get)
+        allow(Tastytrade::FileStore).to receive(:get)
           .with("remember_test@example.com_production").and_return("saved_remember")
-        allow(Tastytrade::KeyringStore).to receive(:get)
+        allow(Tastytrade::FileStore).to receive(:get)
+          .with("user_data_test@example.com_production")
+          .and_return('{"email":"test@example.com","username":"testuser","external_id":"test-external-id"}')
+        allow(Tastytrade::FileStore).to receive(:get)
           .with("session_expiration_test@example.com_production").and_return(nil)
       end
 
@@ -128,6 +136,8 @@ RSpec.describe Tastytrade::SessionManager do
         expect(result).to eq({
                                session_token: "saved_token",
                                remember_token: "saved_remember",
+                               user_data: { "email" => "test@example.com", "username" => "testuser",
+                                            "external_id" => "test-external-id" },
                                session_expiration: nil,
                                username: username,
                                environment: environment
@@ -137,7 +147,7 @@ RSpec.describe Tastytrade::SessionManager do
 
     context "without saved token" do
       before do
-        allow(Tastytrade::KeyringStore).to receive(:get)
+        allow(Tastytrade::FileStore).to receive(:get)
           .with("token_test@example.com_production").and_return(nil)
       end
 
@@ -157,9 +167,9 @@ RSpec.describe Tastytrade::SessionManager do
 
     context "with saved remember token" do
       before do
-        allow(Tastytrade::KeyringStore).to receive(:get)
+        allow(Tastytrade::FileStore).to receive(:get)
           .with("password_test@example.com_production").and_return(nil)
-        allow(Tastytrade::KeyringStore).to receive(:get)
+        allow(Tastytrade::FileStore).to receive(:get)
           .with("remember_test@example.com_production").and_return("saved_remember")
       end
 
@@ -177,9 +187,9 @@ RSpec.describe Tastytrade::SessionManager do
 
     context "with saved password" do
       before do
-        allow(Tastytrade::KeyringStore).to receive(:get)
+        allow(Tastytrade::FileStore).to receive(:get)
           .with("remember_test@example.com_production").and_return(nil)
-        allow(Tastytrade::KeyringStore).to receive(:get)
+        allow(Tastytrade::FileStore).to receive(:get)
           .with("password_test@example.com_production").and_return("saved_password")
       end
 
@@ -199,9 +209,9 @@ RSpec.describe Tastytrade::SessionManager do
       let(:environment) { "sandbox" }
 
       before do
-        allow(Tastytrade::KeyringStore).to receive(:get)
+        allow(Tastytrade::FileStore).to receive(:get)
           .with("password_test@example.com_sandbox").and_return("saved_password")
-        allow(Tastytrade::KeyringStore).to receive(:get)
+        allow(Tastytrade::FileStore).to receive(:get)
           .with("remember_test@example.com_sandbox").and_return(nil)
       end
 
@@ -216,7 +226,7 @@ RSpec.describe Tastytrade::SessionManager do
 
     context "without saved credentials" do
       before do
-        allow(Tastytrade::KeyringStore).to receive(:get).and_return(nil)
+        allow(Tastytrade::FileStore).to receive(:get).and_return(nil)
       end
 
       it "returns nil" do
@@ -225,9 +235,9 @@ RSpec.describe Tastytrade::SessionManager do
     end
 
     it "handles errors gracefully" do
-      allow(Tastytrade::KeyringStore).to receive(:get)
+      allow(Tastytrade::FileStore).to receive(:get)
         .with("password_test@example.com_production").and_return("password")
-      allow(Tastytrade::KeyringStore).to receive(:get)
+      allow(Tastytrade::FileStore).to receive(:get)
         .with("remember_test@example.com_production").and_return(nil)
       allow(new_session).to receive(:login).and_raise(StandardError, "Login error")
 
@@ -238,13 +248,13 @@ RSpec.describe Tastytrade::SessionManager do
 
   describe "#clear_session!" do
     it "deletes all stored credentials" do
-      expect(Tastytrade::KeyringStore).to receive(:delete)
+      expect(Tastytrade::FileStore).to receive(:delete)
         .with("token_test@example.com_production")
-      expect(Tastytrade::KeyringStore).to receive(:delete)
+      expect(Tastytrade::FileStore).to receive(:delete)
         .with("remember_test@example.com_production")
-      expect(Tastytrade::KeyringStore).to receive(:delete)
+      expect(Tastytrade::FileStore).to receive(:delete)
         .with("password_test@example.com_production")
-      expect(Tastytrade::KeyringStore).to receive(:delete)
+      expect(Tastytrade::FileStore).to receive(:delete)
         .with("session_expiration_test@example.com_production")
 
       manager.clear_session!
@@ -261,7 +271,7 @@ RSpec.describe Tastytrade::SessionManager do
   describe "#saved_credentials?" do
     context "with saved password" do
       before do
-        allow(Tastytrade::KeyringStore).to receive(:get)
+        allow(Tastytrade::FileStore).to receive(:get)
           .with("password_test@example.com_production").and_return("password")
       end
 
@@ -272,9 +282,9 @@ RSpec.describe Tastytrade::SessionManager do
 
     context "with saved remember token" do
       before do
-        allow(Tastytrade::KeyringStore).to receive(:get)
+        allow(Tastytrade::FileStore).to receive(:get)
           .with("password_test@example.com_production").and_return(nil)
-        allow(Tastytrade::KeyringStore).to receive(:get)
+        allow(Tastytrade::FileStore).to receive(:get)
           .with("remember_test@example.com_production").and_return("token")
       end
 
@@ -285,7 +295,7 @@ RSpec.describe Tastytrade::SessionManager do
 
     context "without saved credentials" do
       before do
-        allow(Tastytrade::KeyringStore).to receive(:get).and_return(nil)
+        allow(Tastytrade::FileStore).to receive(:get).and_return(nil)
       end
 
       it "returns false" do
