@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Nothing yet
+
+### Changed
+- Nothing yet
+
+### Deprecated
+- Nothing yet
+
+### Removed
+- Nothing yet
+
+### Fixed
+- Nothing yet
+
+### Security
+- Nothing yet
+
+## [0.2.0] - 2025-08-01
+
+### Added
 - Initial gem structure with professional Ruby gem scaffold
 - Basic configuration files (RuboCop, RSpec, GitHub Actions)
 - Development tooling setup
@@ -78,12 +98,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Account data parsing from API response (#25)
 - "Failed to load current account" error in balance view by implementing account caching
 - TTY::Table rendering in non-TTY environments with fallback formatting
-
-### Deprecated
-- Nothing yet
-
-### Removed
-- Nothing yet
-
-### Security
-- Nothing yet
