@@ -85,9 +85,9 @@ Create a release PR following Ruby gem best practices.
    ### Post-Merge Steps
    After merging this PR:
    1. \`git checkout main && git pull\`
-   2. \`git tag v<VERSION>\`
-   3. \`git push --tags\`
-   4. \`bundle exec rake release\`"
+   2. \`bundle exec rake release\`
+   
+   Note: The rake release command will automatically create and push the git tag v<VERSION>"
    ```
 
 ## Important Notes
@@ -96,7 +96,8 @@ Create a release PR following Ruby gem best practices.
 - Ensure all tests pass before creating the PR
 - Run RuboCop to ensure code quality
 - The version in the PR title and body should NOT include the 'v' prefix (e.g., "0.2.0" not "v0.2.0")
-- The git tag SHOULD include the 'v' prefix (e.g., "v0.2.0")
+- The rake release command will automatically create the git tag with 'v' prefix (e.g., "v0.2.0")
+- You need a RubyGems.org account to run rake release
 
 ## Example
 
