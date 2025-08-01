@@ -15,15 +15,15 @@ This document outlines the development roadmap for the unofficial Tastytrade Rub
 **Target: Q3 2025 (July - September)**
 
 #### Authentication & Session Management
-- [ ] Basic session class with login/logout
-- [ ] Token management and refresh
-- [ ] Production/sandbox environment support
-- [ ] Credentials storage (secure)
-- [ ] Session validation and error handling
+- [x] Basic session class with login/logout (closes #1)
+- [x] Token management and refresh (closes #2)
+- [x] Production/sandbox environment support (closes #3)
+- [x] Credentials storage (secure) (closes #4)
+- [x] Session validation and error handling (closes #5)
 
 #### Account Operations
-- [ ] Fetch account info and balances
-- [ ] Get positions
+- [x] Fetch account info and balances (closes #6)
+- [x] Get positions
 - [ ] Get transaction history
 - [ ] Calculate buying power
 - [ ] Account status and trading permissions
@@ -36,11 +36,11 @@ This document outlines the development roadmap for the unofficial Tastytrade Rub
 - [ ] Basic order types (day, GTC)
 
 #### Core Infrastructure
-- [ ] HTTP client setup (Faraday)
-- [ ] Error handling framework
+- [x] HTTP client setup (Faraday) (closes #16)
+- [x] Error handling framework (closes #17)
 - [ ] Logging system
-- [ ] Configuration management
-- [ ] Basic data models (using dry-struct)
+- [x] Configuration management (closes #19)
+- [x] Basic data models (using dry-struct) (closes #20)
 
 ### Phase 2: Advanced SDK Features
 **Target: Q4 2025 (October - December)**
