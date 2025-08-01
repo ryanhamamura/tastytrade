@@ -48,6 +48,30 @@ Or install it yourself as:
 gem install tastytrade
 ```
 
+## Configuration
+
+### Environment Variables
+
+The tastytrade gem supports authentication via environment variables, which is recommended for automation and CI/CD environments:
+
+```bash
+# Required for environment variable authentication
+export TASTYTRADE_USERNAME="your_email@example.com"
+export TASTYTRADE_PASSWORD="your_password"
+
+# Optional environment variables
+export TASTYTRADE_ENVIRONMENT="sandbox"  # Use "sandbox" for test environment
+export TASTYTRADE_REMEMBER="true"        # Enable remember token
+
+# Alternative shorter variable names
+export TT_USERNAME="your_email@example.com"
+export TT_PASSWORD="your_password"
+export TT_ENVIRONMENT="sandbox"
+export TT_REMEMBER="true"
+```
+
+When environment variables are set, the CLI will automatically use them for authentication without prompting for credentials.
+
 ## Usage
 
 ### Authentication
@@ -75,18 +99,55 @@ session.authenticated? # => true
 
 The gem includes a command-line interface for common operations:
 
+#### Authentication
+
 ```bash
-# Login to your account
+# Login to your account interactively
 tastytrade login
 
 # Login with remember option for automatic session refresh
 tastytrade login --remember
 
+# Login using environment variables (recommended for automation)
+export TASTYTRADE_USERNAME="your_email@example.com"
+export TASTYTRADE_PASSWORD="your_password"
+tastytrade login
+
+# Or use shorter variable names
+export TT_USERNAME="your_email@example.com"
+export TT_PASSWORD="your_password"
+tastytrade login
+
+# Use sandbox environment for testing
+export TASTYTRADE_ENVIRONMENT="sandbox"
+tastytrade login
+
+# Enable remember token via environment
+export TASTYTRADE_REMEMBER="true"
+tastytrade login
+
+```
+
+#### Account Operations
+
+```bash
 # View account balances
 tastytrade balance
 
 # View balances for all accounts
 tastytrade balance --all
+
+# View account positions
+tastytrade positions
+
+# Filter positions by symbol
+tastytrade positions --symbol AAPL
+
+# Filter positions by underlying symbol (for options)
+tastytrade positions --underlying-symbol SPY
+
+# Include closed positions
+tastytrade positions --include-closed
 
 # List all accounts
 tastytrade accounts

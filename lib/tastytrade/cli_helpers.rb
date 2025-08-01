@@ -106,7 +106,9 @@ module Tastytrade
 
       @current_account = Tastytrade::Models::Account.get(current_session, account_number)
     rescue StandardError => e
-      warn "Failed to load current account: #{e.message}"
+      # Only warn if debug mode is enabled - otherwise silently return nil
+      # and let the caller handle the fallback
+      warn "Failed to load current account: #{e.message}" if ENV["DEBUG_SESSION"]
       nil
     end
 
@@ -143,6 +145,12 @@ module Tastytrade
         session.instance_variable_set(:@session_expiration, Time.parse(session_data[:session_expiration]))
       end
 
+      # Set user data if available
+      if session_data[:user_data]
+        user = Tastytrade::Models::User.new(session_data[:user_data])
+        session.instance_variable_set(:@user, user)
+      end
+
       # Check if session needs refresh
       if session.expired? && session.remember_token
         info "Session expired, refreshing automatically..."
@@ -154,19 +162,8 @@ module Tastytrade
         return nil
       end
 
-      # Final validation
-      if session.validate
-        session
-      else
-        # Try one more refresh if we have a remember token
-        if session.remember_token
-          session.refresh_session
-          manager.save_session(session) if session.validate
-          session
-        else
-          nil
-        end
-      end
+      # Return the session - validation happens on actual API calls
+      session
     rescue Tastytrade::SessionExpiredError, Tastytrade::AuthenticationError => e
       warning "Session invalid: #{e.message}"
       nil

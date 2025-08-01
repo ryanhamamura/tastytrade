@@ -7,6 +7,26 @@ module Tastytrade
   class Session
     attr_reader :user, :session_token, :remember_token, :is_test, :session_expiration
 
+    # Create a session from environment variables
+    #
+    # @return [Session, nil] Session instance or nil if environment variables not set
+    def self.from_environment
+      username = ENV["TASTYTRADE_USERNAME"] || ENV["TT_USERNAME"]
+      password = ENV["TASTYTRADE_PASSWORD"] || ENV["TT_PASSWORD"]
+
+      return nil unless username && password
+
+      remember = ENV["TASTYTRADE_REMEMBER"]&.downcase == "true" || ENV["TT_REMEMBER"]&.downcase == "true"
+      is_test = ENV["TASTYTRADE_ENVIRONMENT"]&.downcase == "sandbox" || ENV["TT_ENVIRONMENT"]&.downcase == "sandbox"
+
+      new(
+        username: username,
+        password: password,
+        remember_me: remember,
+        is_test: is_test
+      )
+    end
+
     # Initialize a new session
     #
     # @param username [String] Tastytrade username
@@ -47,9 +67,14 @@ module Tastytrade
     #
     # @return [Boolean] True if session is valid
     def validate
+      warn "DEBUG: Validating session, user=#{@user&.email}" if ENV["DEBUG_SESSION"]
       response = get("/sessions/validate")
+      if ENV["DEBUG_SESSION"]
+        warn "DEBUG: Validate response email=#{response["data"]["email"]}, user email=#{@user&.email}"
+      end
       response["data"]["email"] == @user.email
-    rescue Tastytrade::Error
+    rescue Tastytrade::Error => e
+      warn "DEBUG: Validate error: #{e.message}" if ENV["DEBUG_SESSION"]
       false
     end
 

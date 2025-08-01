@@ -18,6 +18,8 @@ RSpec.describe "Tastytrade::CLI authentication commands" do
     allow(cli).to receive(:interactive_mode) # Mock interactive mode
     allow(Tastytrade::SessionManager).to receive(:new).and_return(session_manager)
     allow(session_manager).to receive(:save_session).and_return(true)
+    # Stub environment variable login to return nil so tests use interactive login
+    allow(Tastytrade::Session).to receive(:from_environment).and_return(nil)
   end
 
   describe "#login" do
@@ -147,6 +149,9 @@ RSpec.describe "Tastytrade::CLI authentication commands" do
       end
 
       it "saves username to config" do
+        # Allow config.set calls since save_user_session sets multiple values
+        allow(config).to receive(:set)
+
         # The config is set inside SessionManager#save_session
         expect(Tastytrade::SessionManager).to receive(:new).with(
           username: "test@example.com",
