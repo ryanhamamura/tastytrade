@@ -14,6 +14,8 @@ require_relative "tastytrade/version"
 require_relative "tastytrade/client"
 require_relative "tastytrade/models"
 require_relative "tastytrade/session"
+require_relative "tastytrade/order"
+require_relative "tastytrade/instruments/equity"
 
 module Tastytrade
   class Error < StandardError; end
@@ -24,6 +26,12 @@ module Tastytrade
   class TokenRefreshError < AuthenticationError; end
   class InvalidCredentialsError < AuthenticationError; end
   class NetworkTimeoutError < Error; end
+
+  # Order errors
+  class OrderError < Error; end
+  class InvalidOrderError < OrderError; end
+  class InsufficientFundsError < OrderError; end
+  class MarketClosedError < OrderError; end
 
   # API URLs
   API_URL = "https://api.tastyworks.com"

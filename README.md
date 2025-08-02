@@ -148,7 +148,30 @@ tastytrade positions --underlying-symbol SPY
 
 # Include closed positions
 tastytrade positions --include-closed
+```
 
+#### Order Placement
+
+```bash
+# Place a market buy order
+tastytrade order AAPL 100
+
+# Place a limit buy order
+tastytrade order AAPL 100 --type limit --price 150.50
+
+# Place a sell order
+tastytrade order AAPL 100 --action sell
+
+# Dry run an order (simulate without placing)
+tastytrade order AAPL 100 --dry-run
+
+# Place order on specific account
+tastytrade order AAPL 100 --account 5WX12345
+```
+
+#### Account Management
+
+```bash
 # List all accounts
 tastytrade accounts
 
@@ -227,6 +250,42 @@ positions.each do |position|
   position.long? # => true
   position.short? # => false
 end
+```
+
+### Order Placement
+
+```ruby
+# Create an order leg for buying stock
+leg = Tastytrade::OrderLeg.new(
+  action: Tastytrade::OrderAction::BUY_TO_OPEN,
+  symbol: 'AAPL',
+  quantity: 100
+)
+
+# Create a market order
+market_order = Tastytrade::Order.new(
+  type: Tastytrade::OrderType::MARKET,
+  legs: leg
+)
+
+# Create a limit order
+limit_order = Tastytrade::Order.new(
+  type: Tastytrade::OrderType::LIMIT,
+  legs: leg,
+  price: 150.50  # Will be converted to BigDecimal
+)
+
+# Place the order
+response = account.place_order(session, market_order)
+
+# Dry run (simulate order without placing)
+response = account.place_order(session, limit_order, dry_run: true)
+
+# Check order response
+puts response.order_id           # => "123456"
+puts response.status             # => "Filled"
+puts response.buying_power_effect # => BigDecimal("-15050.00")
+puts response.warnings           # => [] or warning messages
 ```
 
 ## Development
