@@ -503,6 +503,122 @@ module Tastytrade
       interactive_mode
     end
 
+    desc "order SYMBOL QUANTITY", "Place an order for equities"
+    option :type, default: "market", desc: "Order type (market or limit)"
+    option :price, type: :numeric, desc: "Price for limit orders"
+    option :action, default: "buy", desc: "Order action (buy or sell)"
+    option :dry_run, type: :boolean, default: false, desc: "Simulate order without placing it"
+    option :account, type: :string, desc: "Account number (uses default if not specified)"
+    # Place an order for equities
+    #
+    # @example Place a market buy order
+    #   tastytrade order AAPL 100
+    #
+    # @example Place a limit buy order
+    #   tastytrade order AAPL 100 --type limit --price 150.50
+    #
+    # @example Place a sell order
+    #   tastytrade order AAPL 100 --action sell
+    #
+    # @example Dry run an order
+    #   tastytrade order AAPL 100 --dry-run
+    #
+    def order(symbol, quantity)
+      require_authentication!
+
+      # Get the account to use
+      account = if options[:account]
+        Tastytrade::Models::Account.get(current_session, options[:account])
+      else
+        current_account || select_account_interactively
+      end
+
+      return unless account
+
+      # Create the order leg
+      action = case options[:action].downcase
+               when "buy"
+                 Tastytrade::OrderAction::BUY_TO_OPEN
+               when "sell"
+                 Tastytrade::OrderAction::SELL_TO_CLOSE
+               else
+                 error "Invalid action: #{options[:action]}. Must be 'buy' or 'sell'"
+                 exit 1
+      end
+
+      leg = Tastytrade::OrderLeg.new(
+        action: action,
+        symbol: symbol.upcase,
+        quantity: quantity
+      )
+
+      # Create the order
+      order_type = case options[:type].downcase
+                   when "market"
+                     Tastytrade::OrderType::MARKET
+                   when "limit"
+                     Tastytrade::OrderType::LIMIT
+                   else
+                     error "Invalid order type: #{options[:type]}. Must be 'market' or 'limit'"
+                     exit 1
+      end
+
+      begin
+        order = Tastytrade::Order.new(
+          type: order_type,
+          legs: leg,
+          price: options[:price]
+        )
+      rescue ArgumentError => e
+        error e.message
+        exit 1
+      end
+
+      # Place the order
+      order_desc = "#{options[:type]} #{options[:action]} order for #{quantity} shares of #{symbol}"
+      info "Placing #{options[:dry_run] ? "simulated " : ""}#{order_desc}..."
+
+      begin
+        response = account.place_order(current_session, order, dry_run: options[:dry_run])
+
+        if options[:dry_run]
+          success "Dry run successful!"
+        else
+          success "Order placed successfully!"
+        end
+
+        puts ""
+        puts "Order Details:"
+        if response.order_id && !response.order_id.empty?
+          puts "  Order ID: #{response.order_id}"
+        end
+        if response.status && !response.status.empty?
+          puts "  Status: #{response.status}"
+        end
+        if response.account_number && !response.account_number.empty?
+          puts "  Account: #{response.account_number}"
+        end
+        if response.buying_power_effect
+          puts "  Buying Power Effect: #{format_currency(response.buying_power_effect)}"
+        end
+
+        if response.warnings.any?
+          puts ""
+          warning "Warnings:"
+          response.warnings.each do |w|
+            if w.is_a?(Hash)
+              puts "  - #{w["message"] || w["code"]}"
+            else
+              puts "  - #{w}"
+            end
+          end
+        end
+      rescue Tastytrade::Error => e
+        error "Failed to place order: #{e.message}"
+        exit 1
+      end
+    end
+
     private
 
     def interactive_mode
@@ -523,7 +639,7 @@ module Tastytrade
         when :positions
           interactive_positions
         when :orders
-          info "Orders command not yet implemented"
+          interactive_order
         when :settings
           info "Settings command not yet implemented"
         when :exit
@@ -732,6 +848,106 @@ module Tastytrade
       prompt.keypress("\nPress any key to continue...")
     rescue StandardError => e
       error "Unexpected error: #{e.message}"
+      prompt.keypress("\nPress any key to continue...")
+    end
+
+    def interactive_order
+      account = @current_account || current_account || select_account_interactively
+      return unless account
+
+      # Get order details
+      symbol = prompt.ask("Enter symbol:") { |q| q.modify :up }.upcase
+      quantity = prompt.ask("Enter quantity:", convert: :int) do |q|
+        q.validate(/^\d+$/, "Must be a positive number")
+      end
+
+      # Create vim-enabled prompt for order type
+      order_type_prompt = create_vim_prompt
+      order_type = order_type_prompt.select("Select order type:", per_page: 2) do |menu|
+        menu.enum "."
+        menu.help "(Use ↑/↓ arrows, vim j/k, numbers 1-2, q or ESC to go back)"
+        menu.choice "Market - Execute at current market price", "Market"
+        menu.choice "Limit - Execute at specified price or better", "Limit"
+      end
+
+      return if @exit_requested
+
+      price = nil
+      if order_type == "Limit"
+        price = prompt.ask("Enter limit price:", convert: :float) do |q|
+          q.validate(/^\d+(\.\d+)?$/, "Must be a valid price")
+        end
+      end
+
+      # Create vim-enabled prompt for action
+      action_prompt = create_vim_prompt
+      action = action_prompt.select("Select action:", per_page: 2) do |menu|
+        menu.enum "."
+        menu.help "(Use ↑/↓ arrows, vim j/k, numbers 1-2, q or ESC to go back)"
+        menu.choice "Buy - Purchase shares", "Buy"
+        menu.choice "Sell - Sell shares", "Sell"
+      end
+
+      return if @exit_requested
+
+      # Show order summary
+      puts "\nOrder Summary:"
+      puts "  Symbol: #{symbol}"
+      puts "  Quantity: #{quantity}"
+      puts "  Type: #{order_type}"
+      puts "  Price: #{price ? format_currency(price) : "Market"}" if order_type == "Limit"
+      puts "  Action: #{action}"
+      puts "  Account: #{account.account_number}"
+
+      dry_run = prompt.yes?("\nRun as simulation (dry run)?")
+
+      if prompt.yes?("\nPlace this order?")
+        # Create the order
+        order_action = action == "Buy" ? Tastytrade::OrderAction::BUY_TO_OPEN : Tastytrade::OrderAction::SELL_TO_CLOSE
+
+        leg = Tastytrade::OrderLeg.new(
+          action: order_action,
+          symbol: symbol,
+          quantity: quantity
+        )
+
+        order_type_constant = order_type == "Market" ? Tastytrade::OrderType::MARKET : Tastytrade::OrderType::LIMIT
+
+        begin
+          order = Tastytrade::Order.new(
+            type: order_type_constant,
+            legs: leg,
+            price: price
+          )
+
+          info "Placing #{dry_run ? "simulated " : ""}order..."
+          response = account.place_order(current_session, order, dry_run: dry_run)
+
+          success "#{dry_run ? "Dry run" : "Order placed"} successfully!"
+
+          puts "\nOrder Details:"
+          puts "  Order ID: #{response.order_id}"
+          puts "  Status: #{response.status}"
+          puts "  Buying Power Effect: #{format_currency(response.buying_power_effect)}"
+
+          if response.warnings.any?
+            warning "Warnings:"
+            response.warnings.each { |w| puts "  - #{w}" }
+          end
+        rescue Tastytrade::Error => e
+          error "Failed to place order: #{e.message}"
+        rescue ArgumentError => e
+          error e.message
+        end
+      else
+        info "Order cancelled"
+      end
+
+      prompt.keypress("\nPress any key to continue...")
+    rescue Interrupt
+      nil
+    rescue => e
+      error "Failed to place order: #{e.message}"
       prompt.keypress("\nPress any key to continue...")
     end
   end

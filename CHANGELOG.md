@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Order placement functionality for equities (#11)
+  - Order and OrderLeg classes for building orders programmatically
+  - Support for market and limit order types
+  - All four order actions: BUY_TO_OPEN, SELL_TO_CLOSE, SELL_TO_OPEN, BUY_TO_CLOSE
+  - Time in force options: DAY and GTC
+  - Automatic price-effect calculation (Debit for buys, Credit for sells)
+  - Account#place_order method for order submission
+  - OrderResponse model for parsing placement results
+  - Equity instrument class with build_leg helper method
+  - CLI `order` command with options for type, price, action, and dry-run
+  - Interactive order menu with vim navigation for order type and action
+  - Dry-run simulation capability for testing orders
+  - Improved error handling with helpful messages for common scenarios
+  - Comprehensive test coverage for all order functionality
 - CLI positions command (#7)
   - `positions` command to display account positions in table format
   - Position filtering options: --symbol, --underlying-symbol, --include-closed

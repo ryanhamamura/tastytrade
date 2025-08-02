@@ -108,6 +108,13 @@ module Tastytrade
       return response.status.to_s if response.body.nil? || response.body.empty?
 
       data = parse_json(response.body)
+
+      # Handle preflight check failures with detailed errors
+      if data["code"] == "preflight_check_failure" && data["errors"]
+        error_details = data["errors"].map { |e| e["message"] }.join(", ")
+        return "#{data["message"]}: #{error_details}"
+      end
+
       # Handle both old and new API error formats
       data["error"] || data["message"] || data["reason"] || response.status.to_s
     rescue StandardError

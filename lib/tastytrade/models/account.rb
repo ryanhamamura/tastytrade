@@ -68,6 +68,20 @@ module Tastytrade
         session.get("/accounts/#{account_number}/trading-status/")["data"]
       end
 
+      # Place an order
+      #
+      # @param session [Tastytrade::Session] Active session
+      # @param order [Tastytrade::Order] Order to place
+      # @param dry_run [Boolean] Whether to simulate the order without placing it
+      # @return [OrderResponse] Response from order placement
+      def place_order(session, order, dry_run: false)
+        endpoint = "/accounts/#{account_number}/orders"
+        endpoint += "/dry-run" if dry_run
+
+        response = session.post(endpoint, order.to_api_params)
+        OrderResponse.new(response["data"])
+      end
+
       def closed?
         @is_closed == true
       end
