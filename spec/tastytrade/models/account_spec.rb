@@ -6,7 +6,7 @@ require "bigdecimal"
 RSpec.describe Tastytrade::Models::Account do
   let(:account_data) do
     {
-      "account-number" => "123456",
+      "account-number" => "5WT0001",
       "nickname" => "My Account",
       "account-type-name" => "Individual",
       "opened-at" => "2025-01-01T10:00:00Z",
@@ -25,7 +25,7 @@ RSpec.describe Tastytrade::Models::Account do
 
   describe "attributes" do
     it "parses account number" do
-      expect(account.account_number).to eq("123456")
+      expect(account.account_number).to eq("5WT0001")
     end
 
     it "parses nickname" do
@@ -79,7 +79,7 @@ RSpec.describe Tastytrade::Models::Account do
       expect(accounts).to be_an(Array)
       expect(accounts.size).to eq(2)
       expect(accounts.first).to be_a(described_class)
-      expect(accounts.first.account_number).to eq("123456")
+      expect(accounts.first.account_number).to eq("5WT0001")
       expect(accounts.last.account_number).to eq("789012")
     end
 
@@ -97,12 +97,12 @@ RSpec.describe Tastytrade::Models::Account do
     end
 
     it "returns single Account object" do
-      allow(session).to receive(:get).with("/accounts/123456/").and_return(response)
+      allow(session).to receive(:get).with("/accounts/5WT0001/").and_return(response)
 
-      account = described_class.get(session, "123456")
+      account = described_class.get(session, "5WT0001")
 
       expect(account).to be_a(described_class)
-      expect(account.account_number).to eq("123456")
+      expect(account.account_number).to eq("5WT0001")
     end
   end
 
@@ -110,7 +110,7 @@ RSpec.describe Tastytrade::Models::Account do
     let(:balance_data) do
       {
         "data" => {
-          "account-number" => "123456",
+          "account-number" => "5WT0001",
           "cash-balance" => "10000.00",
           "net-liquidating-value" => "15000.00"
         }
@@ -118,12 +118,12 @@ RSpec.describe Tastytrade::Models::Account do
     end
 
     it "returns balance data" do
-      allow(session).to receive(:get).with("/accounts/123456/balances/").and_return(balance_data)
+      allow(session).to receive(:get).with("/accounts/5WT0001/balances/").and_return(balance_data)
 
       balance = account.get_balances(session)
 
       expect(balance).to be_a(Tastytrade::Models::AccountBalance)
-      expect(balance.account_number).to eq("123456")
+      expect(balance.account_number).to eq("5WT0001")
       expect(balance.cash_balance).to eq(BigDecimal("10000.00"))
       expect(balance.net_liquidating_value).to eq(BigDecimal("15000.00"))
     end
@@ -142,7 +142,7 @@ RSpec.describe Tastytrade::Models::Account do
     end
 
     it "returns array of positions" do
-      allow(session).to receive(:get).with("/accounts/123456/positions/", {}).and_return(positions_data)
+      allow(session).to receive(:get).with("/accounts/5WT0001/positions/", {}).and_return(positions_data)
 
       positions = account.get_positions(session)
 
@@ -158,14 +158,14 @@ RSpec.describe Tastytrade::Models::Account do
     let(:status_data) do
       {
         "data" => {
-          "account-number" => "123456",
+          "account-number" => "5WT0001",
           "is-pattern-day-trader" => false
         }
       }
     end
 
     it "returns trading status data" do
-      allow(session).to receive(:get).with("/accounts/123456/trading-status/").and_return(status_data)
+      allow(session).to receive(:get).with("/accounts/5WT0001/trading-status/").and_return(status_data)
 
       status = account.get_trading_status(session)
 
@@ -200,6 +200,49 @@ RSpec.describe Tastytrade::Models::Account do
     describe "#foreign?" do
       it "returns false when is_foreign is false" do
         expect(account.foreign?).to be false
+      end
+    end
+
+    describe "#get_transactions" do
+      let(:transaction_data) do
+        {
+          "data" => {
+            "items" => [
+              {
+                "id" => 12345,
+                "account-number" => "5WT0001",
+                "symbol" => "AAPL",
+                "transaction-type" => "Trade",
+                "value" => "-1500.00"
+              }
+            ]
+          }
+        }
+      end
+
+      it "fetches transactions for the account" do
+        allow(Tastytrade::Models::Transaction).to receive(:get_all)
+          .with(session, "5WT0001")
+          .and_return([])
+
+        account.get_transactions(session)
+        expect(Tastytrade::Models::Transaction).to have_received(:get_all).with(session, "5WT0001")
+      end
+
+      it "passes through filter options" do
+        options = {
+          start_date: Date.new(2023, 1, 1),
+          end_date: Date.new(2023, 12, 31),
+          symbol: "AAPL"
+        }
+
+        allow(Tastytrade::Models::Transaction).to receive(:get_all)
+          .with(session, "5WT0001", **options)
+          .and_return([])
+
+        account.get_transactions(session, **options)
+        expect(Tastytrade::Models::Transaction).to have_received(:get_all)
+          .with(session, "5WT0001", **options)
       end
     end
   end

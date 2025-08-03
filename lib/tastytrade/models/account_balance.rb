@@ -63,6 +63,52 @@ module Tastytrade
         total_equity_value + total_derivative_value
       end
 
+      # Calculate derivative buying power usage percentage
+      def derivative_buying_power_usage_percentage
+        return BigDecimal("0") if derivative_buying_power.zero?
+
+        used_derivative_buying_power = derivative_buying_power - available_trading_funds
+        ((used_derivative_buying_power / derivative_buying_power) * 100).round(2)
+      end
+
+      # Calculate day trading buying power usage percentage
+      def day_trading_buying_power_usage_percentage
+        return BigDecimal("0") if day_trading_buying_power.zero?
+
+        used_day_trading_buying_power = day_trading_buying_power - available_trading_funds
+        ((used_day_trading_buying_power / day_trading_buying_power) * 100).round(2)
+      end
+
+      # Get the minimum buying power across all types
+      def minimum_buying_power
+        [equity_buying_power, derivative_buying_power, day_trading_buying_power].min
+      end
+
+      # Check if account has sufficient buying power for a given amount
+      def sufficient_buying_power?(amount, buying_power_type: :equity)
+        bp = case buying_power_type
+             when :equity then equity_buying_power
+             when :derivative then derivative_buying_power
+             when :day_trading then day_trading_buying_power
+             else equity_buying_power
+        end
+
+        bp >= BigDecimal(amount.to_s)
+      end
+
+      # Calculate buying power impact as percentage
+      def buying_power_impact_percentage(amount, buying_power_type: :equity)
+        bp = case buying_power_type
+             when :equity then equity_buying_power
+             when :derivative then derivative_buying_power
+             when :day_trading then day_trading_buying_power
+             else equity_buying_power
+        end
+
+        return BigDecimal("0") if bp.zero?
+        ((BigDecimal(amount.to_s) / bp) * 100).round(2)
+      end
+
       private
 
       # Parse string value to BigDecimal, handling nil and empty strings

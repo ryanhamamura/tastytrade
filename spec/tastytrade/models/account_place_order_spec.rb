@@ -95,7 +95,8 @@ RSpec.describe "Tastytrade::Models::Account#place_order" do
         anything
       )
 
-      expect(response.buying_power_effect).to eq(BigDecimal("1.50"))
+      expect(response.buying_power_effect).to be_a(Tastytrade::Models::BuyingPowerEffect)
+      expect(response.buying_power_effect.impact).to eq(BigDecimal("1.50"))
       expect(response.warnings).not_to be_empty
     end
   end

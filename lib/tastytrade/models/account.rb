@@ -82,6 +82,23 @@ module Tastytrade
         OrderResponse.new(response["data"])
       end
 
+      # Get transaction history
+      #
+      # @param session [Tastytrade::Session] Active session
+      # @param options [Hash] Optional filters
+      # @option options [Date, String] :start_date Start date for transactions
+      # @option options [Date, String] :end_date End date for transactions
+      # @option options [String] :symbol Filter by symbol
+      # @option options [String] :underlying_symbol Filter by underlying symbol
+      # @option options [String] :instrument_type Filter by instrument type
+      # @option options [Array<String>] :transaction_types Filter by transaction types
+      # @option options [Integer] :per_page Number of results per page (default: 250)
+      # @option options [Integer] :page_offset Page offset for pagination
+      # @return [Array<Transaction>] Array of transactions
+      def get_transactions(session, **options)
+        Transaction.get_all(session, account_number, **options)
+      end
+
       def closed?
         @is_closed == true
       end
