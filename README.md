@@ -20,9 +20,11 @@ This Ruby gem provides a simple interface to interact with the Tastytrade API, a
 - Secure authentication with Tastytrade API
 - Real-time market data access
 - Account management and portfolio tracking
-- Order placement and management
+- Order placement and management with dry-run support
 - Position monitoring
-- Transaction history
+- Transaction history with filtering and grouping
+- Buying power calculations and monitoring
+- CLI with interactive mode and rich formatting
 
 ## Roadmap
 
@@ -150,6 +152,40 @@ tastytrade positions --underlying-symbol SPY
 tastytrade positions --include-closed
 ```
 
+#### Transaction History
+
+```bash
+# View all transactions
+tastytrade history
+
+# Filter by date range
+tastytrade history --start-date 2024-01-01 --end-date 2024-12-31
+
+# Filter by symbol
+tastytrade history --symbol AAPL
+
+# Group transactions by symbol, type, or date
+tastytrade history --group-by symbol
+tastytrade history --group-by type
+tastytrade history --group-by date
+
+# Limit number of transactions
+tastytrade history --limit 50
+
+# Combine filters
+tastytrade history --symbol AAPL --start-date 2024-01-01 --group-by date
+```
+
+#### Buying Power Status
+
+```bash
+# View buying power status
+tastytrade buying_power
+
+# View buying power for specific account
+tastytrade buying_power --account 5WX12345
+```
+
 #### Order Placement
 
 ```bash
@@ -167,6 +203,8 @@ tastytrade order AAPL 100 --dry-run
 
 # Place order on specific account
 tastytrade order AAPL 100 --account 5WX12345
+
+# Note: Orders that would use >80% of buying power will prompt for confirmation
 ```
 
 #### Account Management
@@ -213,10 +251,20 @@ balance.cash_balance # => BigDecimal("10000.50")
 balance.net_liquidating_value # => BigDecimal("42001.00")
 balance.equity_buying_power # => BigDecimal("20000.00")
 balance.available_trading_funds # => BigDecimal("12000.00")
+balance.day_trading_buying_power # => BigDecimal("40000.00")
+balance.derivative_buying_power # => BigDecimal("20000.00")
 
 # Check buying power usage
 balance.buying_power_usage_percentage # => BigDecimal("40.00")
+balance.derivative_buying_power_usage_percentage # => BigDecimal("25.00")
 balance.high_buying_power_usage? # => false (checks if > 80%)
+
+# Check if sufficient buying power for order
+balance.sufficient_buying_power?(15000) # => true
+balance.sufficient_buying_power?(15000, buying_power_type: :derivative) # => true
+
+# Calculate buying power impact
+balance.buying_power_impact_percentage(15000) # => BigDecimal("75.00")
 
 # Calculate totals
 balance.total_equity_value # => BigDecimal("30001.00")
@@ -284,8 +332,52 @@ response = account.place_order(session, limit_order, dry_run: true)
 # Check order response
 puts response.order_id           # => "123456"
 puts response.status             # => "Filled"
-puts response.buying_power_effect # => BigDecimal("-15050.00")
+
+# Dry run orders return a BuyingPowerEffect object
+if response.buying_power_effect.is_a?(Tastytrade::Models::BuyingPowerEffect)
+  bp_effect = response.buying_power_effect
+  puts bp_effect.buying_power_change_amount # => BigDecimal("15050.00")
+  puts bp_effect.buying_power_usage_percentage # => BigDecimal("75.25")
+  puts bp_effect.exceeds_threshold?(80) # => false
+  puts bp_effect.debit? # => true
+else
+  puts response.buying_power_effect # => BigDecimal("-15050.00")
+end
+
 puts response.warnings           # => [] or warning messages
+```
+
+### Transaction History
+
+```ruby
+# Get all transactions
+transactions = account.get_transactions(session)
+
+# Filter transactions
+transactions = account.get_transactions(session,
+  start_date: Date.new(2024, 1, 1),
+  end_date: Date.new(2024, 12, 31),
+  symbol: 'AAPL',
+  transaction_types: ['Trade'],
+  per_page: 100
+)
+
+# Work with transactions
+transactions.each do |transaction|
+  puts transaction.symbol               # => "AAPL"
+  puts transaction.transaction_type     # => "Trade"
+  puts transaction.transaction_sub_type # => "Buy"
+  puts transaction.quantity             # => BigDecimal("100")
+  puts transaction.price                # => BigDecimal("150.00")
+  puts transaction.value                # => BigDecimal("-15000.00")
+  puts transaction.net_value            # => BigDecimal("-15007.00")
+  puts transaction.executed_at          # => Time object
+  
+  # Fee breakdown
+  puts transaction.commission           # => BigDecimal("5.00")
+  puts transaction.clearing_fees        # => BigDecimal("1.00")
+  puts transaction.regulatory_fees      # => BigDecimal("0.50")
+end
 ```
 
 ## Development

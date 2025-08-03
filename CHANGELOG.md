@@ -8,6 +8,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Claude command for planning multi-issue implementations
+  - `.claude/commands/plan.md` command for structured issue planning
+  - Spawns concurrent subagents to research codebase, Python SDK, and CLI
+  - Compiles comprehensive implementation plans with detailed todos
+  - Requires user approval before proceeding with implementation
+- Transaction history functionality (#8)
+  - Transaction model with comprehensive field support including fees and metadata
+  - Get all transactions with automatic pagination
+  - Filtering by date range, symbol, instrument type, and transaction types
+  - Manual pagination control with page_offset and per_page parameters
+  - Account#get_transactions convenience method
+  - CLI `history` command with table display and filtering options
+  - Grouping transactions by symbol, type, or date
+  - Transaction totals and summaries (credits, debits, fees, net cash flow)
+  - Interactive history menu with date and symbol filtering
+  - Full test coverage for Transaction model and API integration
+- Buying power calculation and monitoring (#9)
+  - Extended AccountBalance model with buying power calculation methods
+  - Buying power usage percentage for equity, derivative, and day trading
+  - Check if sufficient buying power exists for orders
+  - Calculate buying power impact percentage for proposed orders
+  - BuyingPowerEffect model for dry-run order validation
+  - Dry-run orders now return detailed buying power impact information
+  - CLI `buying_power` command to display buying power status
+  - Buying power warnings when placing orders that use >80% of available BP
+  - Interactive confirmation for high buying power usage orders
+  - Integration with order placement workflow (both CLI and interactive)
+  - Comprehensive test coverage for all buying power calculations
 - Order placement functionality for equities (#11)
   - Order and OrderLeg classes for building orders programmatically
   - Support for market and limit order types

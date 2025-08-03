@@ -70,11 +70,11 @@ module Tastytrade
         return nil if value.nil?
 
         # Handle dry-run response format with nested object
-        if value.is_a?(Hash)
-          # Extract the impact value from dry-run response
-          parse_financial_value(value["impact"] || value["change-in-buying-power"])
+        if value.is_a?(Hash) && (value["change-in-buying-power"] || value["impact"])
+          # Create a full BuyingPowerEffect object for dry-run responses
+          BuyingPowerEffect.new(value)
         else
-          # Handle regular response format
+          # Handle regular response format (simple numeric value)
           parse_financial_value(value)
         end
       end

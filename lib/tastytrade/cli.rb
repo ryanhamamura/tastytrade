@@ -433,6 +433,157 @@ module Tastytrade
       exit 1
     end
 
+    desc "history", "Display transaction history"
+    option :account, type: :string, desc: "Account number (uses default if not specified)"
+    option :start_date, type: :string, desc: "Start date (YYYY-MM-DD)"
+    option :end_date, type: :string, desc: "End date (YYYY-MM-DD)"
+    option :symbol, type: :string, desc: "Filter by symbol"
+    option :type, type: :string, desc: "Filter by transaction type"
+    option :group_by, type: :string, desc: "Group transactions by: symbol, type, or date"
+    option :limit, type: :numeric, desc: "Limit number of transactions"
+    # Display transaction history with optional filtering and grouping
+    #
+    # @example Display all transactions
+    #   tastytrade history
+    #
+    # @example Display transactions for a specific symbol
+    #   tastytrade history --symbol AAPL
+    #
+    # @example Display transactions for a date range
+    #   tastytrade history --start-date 2024-01-01 --end-date 2024-12-31
+    #
+    # @example Group transactions by symbol
+    #   tastytrade history --group-by symbol
+    #
+    # @example Filter by transaction type
+    #   tastytrade history --type Trade
+    #
+    def history
+      require_authentication!
+
+      # Get the account to use
+      account = if options[:account]
+        Tastytrade::Models::Account.get(current_session, options[:account])
+      else
+        current_account || select_account_interactively
+      end
+
+      return unless account
+
+      info "Fetching transaction history for account #{account.account_number}..."
+
+      # Build filter options
+      filter_options = {}
+      filter_options[:start_date] = Date.parse(options[:start_date]) if options[:start_date]
+      filter_options[:end_date] = Date.parse(options[:end_date]) if options[:end_date]
+      filter_options[:symbol] = options[:symbol].upcase if options[:symbol]
+      filter_options[:transaction_types] = [options[:type]] if options[:type]
+      filter_options[:per_page] = options[:limit] if options[:limit]
+
+      # Fetch transactions
+      transactions = account.get_transactions(current_session, **filter_options)
+
+      if transactions.empty?
+        warning "No transactions found"
+        return
+      end
+
+      # Display transactions using formatter
+      formatter = Tastytrade::HistoryFormatter.new(pastel: pastel)
+      group_by = options[:group_by]&.to_sym
+      formatter.format_table(transactions, group_by: group_by)
+    rescue Date::Error => e
+      error "Invalid date format: #{e.message}. Use YYYY-MM-DD format."
+      exit 1
+    rescue Tastytrade::Error => e
+      error "Failed to fetch transaction history: #{e.message}"
+      exit 1
+    rescue StandardError => e
+      error "Unexpected error: #{e.message}"
+      exit 1
+    end
+
+    desc "buying_power", "Display buying power status"
+    option :account, type: :string, desc: "Account number (uses default if not specified)"
+    # Display buying power status and usage
+    #
+    # @example Display buying power status
+    #   tastytrade buying_power
+    #
+    # @example Display buying power for specific account
+    #   tastytrade buying_power --account 5WX12345
+    #
+    def buying_power
+      require_authentication!
+
+      # Get the account to use
+      account = if options[:account]
+        Tastytrade::Models::Account.get(current_session, options[:account])
+      else
+        current_account || select_account_interactively
+      end
+
+      return unless account
+
+      info "Fetching buying power status for account #{account.account_number}..."
+
+      balance = account.get_balances(current_session)
+
+      # Create buying power status table
+      headers = ["Buying Power Type", "Available", "Usage %", "Status"]
+      rows = [
+        [
+          "Equity Buying Power",
+          format_currency(balance.equity_buying_power),
+          "#{balance.buying_power_usage_percentage.to_s("F")}%",
+          format_bp_status(balance.buying_power_usage_percentage)
+        ],
+        [
+          "Derivative Buying Power",
+          format_currency(balance.derivative_buying_power),
+          "#{balance.derivative_buying_power_usage_percentage.to_s("F")}%",
+          format_bp_status(balance.derivative_buying_power_usage_percentage)
+        ],
+        [
+          "Day Trading Buying Power",
+          format_currency(balance.day_trading_buying_power),
+          "-",
+          balance.day_trading_buying_power > 0 ? pastel.green("Available") : pastel.yellow("N/A")
+        ]
+      ]
+
+      table = TTY::Table.new(headers, rows)
+
+      puts
+      begin
+        puts table.render(:unicode, padding: [0, 1])
+      rescue StandardError
+        # Fallback for testing or non-TTY environments
+        puts headers.join(" | ")
+        puts "-" * 80
+        rows.each { |row| puts row.join(" | ") }
+      end
+
+      # Display additional metrics
+      puts
+      puts "Additional Information:"
+      puts "  Available Trading Funds: #{format_currency(balance.available_trading_funds)}"
+      puts "  Cash Balance: #{format_currency(balance.cash_balance)}"
+      puts "  Net Liquidating Value: #{format_currency(balance.net_liquidating_value)}"
+
+      # Display warnings if needed
+      if balance.high_buying_power_usage?
+        puts
+        warning "High buying power usage detected! Consider reducing positions."
+      end
+    rescue Tastytrade::Error => e
+      error "Failed to fetch buying power status: #{e.message}"
+      exit 1
+    rescue StandardError => e
+      error "Unexpected error: #{e.message}"
+      exit 1
+    end
+
     desc "status", "Check session status"
     def status
       session = current_session
@@ -579,11 +730,41 @@ module Tastytrade
       info "Placing #{options[:dry_run] ? "simulated " : ""}#{order_desc}..."
 
       begin
-        response = account.place_order(current_session, order, dry_run: options[:dry_run])
+        # First do a dry run to check buying power impact
+        dry_run_response = account.place_order(current_session, order, dry_run: true)
 
+        # Check if this is a BuyingPowerEffect object
+        if dry_run_response.buying_power_effect.is_a?(Tastytrade::Models::BuyingPowerEffect)
+          bp_effect = dry_run_response.buying_power_effect
+          bp_usage = bp_effect.buying_power_usage_percentage
+
+          if bp_usage > 80
+            warning "This order will use #{bp_usage.to_s("F")}% of your buying power!"
+
+            # Fetch current balance for more context
+            balance = account.get_balances(current_session)
+            puts ""
+            puts "Current Buying Power Status:"
+            puts "  Available Trading Funds: #{format_currency(balance.available_trading_funds)}"
+            puts "  Equity Buying Power: #{format_currency(balance.equity_buying_power)}"
+            puts "  Current BP Usage: #{balance.buying_power_usage_percentage.to_s("F")}%"
+            puts ""
+
+            unless options[:dry_run]
+              unless prompt.yes?("Are you sure you want to proceed with this order?")
+                info "Order cancelled"
+                return
+              end
+            end
+          end
+        end
+
+        # Place the actual order if not dry run
         if options[:dry_run]
+          response = dry_run_response
           success "Dry run successful!"
         else
+          response = account.place_order(current_session, order, dry_run: false)
           success "Order placed successfully!"
         end
 
@@ -598,8 +779,16 @@ module Tastytrade
         if response.account_number && !response.account_number.empty?
           puts "  Account: #{response.account_number}"
         end
+
+        # Handle both BigDecimal and BuyingPowerEffect
         if response.buying_power_effect
-          puts "  Buying Power Effect: #{format_currency(response.buying_power_effect)}"
+          if response.buying_power_effect.is_a?(Tastytrade::Models::BuyingPowerEffect)
+            bp_effect = response.buying_power_effect
+            puts "  Buying Power Impact: #{format_currency(bp_effect.buying_power_change_amount)}"
+            puts "  BP Usage: #{bp_effect.buying_power_usage_percentage.to_s("F")}%"
+          else
+            puts "  Buying Power Effect: #{format_currency(response.buying_power_effect)}"
+          end
         end
 
         if response.warnings.any?
@@ -638,6 +827,8 @@ module Tastytrade
           info "Portfolio command not yet implemented"
         when :positions
           interactive_positions
+        when :history
+          interactive_history
         when :orders
           interactive_order
         when :settings
@@ -657,13 +848,14 @@ module Tastytrade
 
       result = menu_prompt.select("Main Menu#{account_info}", per_page: 10) do |menu|
         menu.enum "."  # Enable number shortcuts with . delimiter
-        menu.help "(Use ↑/↓ arrows, vim j/k, numbers 1-8, q or ESC to quit)"
+        menu.help "(Use ↑/↓ arrows, vim j/k, numbers 1-9, q or ESC to quit)"
 
         menu.choice "Accounts - View all accounts", :accounts
         menu.choice "Select Account - Choose active account", :select
         menu.choice "Balance - View account balance", :balance
         menu.choice "Portfolio - View holdings", :portfolio
         menu.choice "Positions - View open positions", :positions
+        menu.choice "History - View transaction history", :history
         menu.choice "Orders - View recent orders", :orders
         menu.choice "Settings - Configure preferences", :settings
         menu.choice "Exit", :exit
@@ -851,6 +1043,75 @@ module Tastytrade
       prompt.keypress("\nPress any key to continue...")
     end
 
+    def interactive_history
+      account = @current_account || current_account || select_account_interactively
+      return unless account
+
+      # Create vim-enabled prompt for grouping option
+      group_prompt = create_vim_prompt
+      grouping = group_prompt.select("How would you like to view transactions?", per_page: 5) do |menu|
+        menu.enum "."
+        menu.help "(Use ↑/↓ arrows, vim j/k, numbers 1-5, q or ESC to go back)"
+        menu.choice "All transactions (detailed)", nil
+        menu.choice "Group by symbol", :symbol
+        menu.choice "Group by type", :type
+        menu.choice "Group by date", :date
+        menu.choice "Back to main menu", :back
+      end
+
+      return if @exit_requested || grouping == :back
+
+      # Ask for date range
+      filter_by_date = prompt.yes?("Filter by date range?")
+
+      filter_options = {}
+      if filter_by_date
+        begin
+          start_date = prompt.ask("Enter start date (YYYY-MM-DD):") do |q|
+            q.validate(/^\d{4}-\d{2}-\d{2}$/, "Must be in YYYY-MM-DD format")
+          end
+          filter_options[:start_date] = Date.parse(start_date)
+
+          end_date = prompt.ask("Enter end date (YYYY-MM-DD):") do |q|
+            q.validate(/^\d{4}-\d{2}-\d{2}$/, "Must be in YYYY-MM-DD format")
+          end
+          filter_options[:end_date] = Date.parse(end_date)
+        rescue Date::Error => e
+          error "Invalid date: #{e.message}"
+          prompt.keypress("\nPress any key to continue...")
+          return
+        end
+      end
+
+      # Ask for symbol filter
+      filter_by_symbol = prompt.yes?("Filter by symbol?")
+      if filter_by_symbol
+        symbol = prompt.ask("Enter symbol:") { |q| q.modify :up }.upcase
+        filter_options[:symbol] = symbol
+      end
+
+      info "Fetching transaction history for account #{account.account_number}..."
+
+      transactions = account.get_transactions(current_session, **filter_options)
+
+      if transactions.empty?
+        warning "No transactions found"
+        prompt.keypress("\nPress any key to continue...")
+        return
+      end
+
+      formatter = Tastytrade::HistoryFormatter.new(pastel: pastel)
+      formatter.format_table(transactions, group_by: grouping)
+
+      prompt.keypress("\nPress any key to continue...")
+    rescue Tastytrade::Error => e
+      error "Failed to fetch transaction history: #{e.message}"
+      prompt.keypress("\nPress any key to continue...")
+    rescue StandardError => e
+      error "Unexpected error: #{e.message}"
+      prompt.keypress("\nPress any key to continue...")
+    end
+
     def interactive_order
       account = @current_account || current_account || select_account_interactively
       return unless account
@@ -921,14 +1182,60 @@ module Tastytrade
           )
 
           info "Placing #{dry_run ? "simulated " : ""}order..."
-          response = account.place_order(current_session, order, dry_run: dry_run)
+
+          # First do a dry run to check buying power impact
+          dry_run_response = account.place_order(current_session, order, dry_run: true)
+
+          # Check buying power impact
+          if dry_run_response.buying_power_effect.is_a?(Tastytrade::Models::BuyingPowerEffect)
+            bp_effect = dry_run_response.buying_power_effect
+            bp_usage = bp_effect.buying_power_usage_percentage
+
+            if bp_usage > 80
+              warning "This order will use #{bp_usage.to_s("F")}% of your buying power!"
+
+              # Fetch current balance for more context
+              balance = account.get_balances(current_session)
+              puts ""
+              puts "Current Buying Power Status:"
+              puts "  Available Trading Funds: #{format_currency(balance.available_trading_funds)}"
+              puts "  Equity Buying Power: #{format_currency(balance.equity_buying_power)}"
+              puts "  Current BP Usage: #{balance.buying_power_usage_percentage.to_s("F")}%"
+              puts ""
+
+              unless dry_run
+                unless prompt.yes?("Are you sure you want to proceed with this order?")
+                  info "Order cancelled"
+                  prompt.keypress("\nPress any key to continue...")
+                  return
+                end
+              end
+            end
+          end
+
+          # Place the actual order if not dry run
+          response = if dry_run
+            dry_run_response
+          else
+            account.place_order(current_session, order, dry_run: false)
+          end
 
           success "#{dry_run ? "Dry run" : "Order placed"} successfully!"
 
           puts "\nOrder Details:"
-          puts "  Order ID: #{response.order_id}"
-          puts "  Status: #{response.status}"
-          puts "  Buying Power Effect: #{format_currency(response.buying_power_effect)}"
+          puts "  Order ID: #{response.order_id}" if response.order_id && !response.order_id.empty?
+          puts "  Status: #{response.status}" if response.status && !response.status.empty?
+
+          # Handle both BigDecimal and BuyingPowerEffect
+          if response.buying_power_effect
+            if response.buying_power_effect.is_a?(Tastytrade::Models::BuyingPowerEffect)
+              bp_effect = response.buying_power_effect
+              puts "  Buying Power Impact: #{format_currency(bp_effect.buying_power_change_amount)}"
+              puts "  BP Usage: #{bp_effect.buying_power_usage_percentage.to_s("F")}%"
+            else
+              puts "  Buying Power Effect: #{format_currency(response.buying_power_effect)}"
+            end
+          end
 
           if response.warnings.any?
             warning "Warnings:"
@@ -955,3 +1262,4 @@ end
 
 # Require after CLI class is defined to avoid module/class conflict
 require_relative "cli/positions_formatter"
+require_relative "cli/history_formatter"

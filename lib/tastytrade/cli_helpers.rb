@@ -117,6 +117,22 @@ module Tastytrade
       config.get("current_account_number")
     end
 
+    # Format buying power status based on usage percentage
+    def format_bp_status(usage_percentage)
+      return pastel.dim("N/A") unless usage_percentage
+
+      case usage_percentage.to_f
+      when 0..50
+        pastel.green("Low")
+      when 50..80
+        pastel.yellow("Moderate")
+      when 80..90
+        pastel.bright_yellow("High")
+      else
+        pastel.red("Critical")
+      end
+    end
+
     private
 
     def load_session

@@ -244,4 +244,107 @@ RSpec.describe Tastytrade::Models::AccountBalance do
       expect(subject.equity_buying_power).to eq(BigDecimal("123456.789"))
     end
   end
+
+  describe "#derivative_buying_power_usage_percentage" do
+    it "calculates derivative BP usage correctly" do
+      # Used BP = 15000 - 12000 = 3000
+      # Percentage = 3000 / 15000 * 100 = 20%
+      expect(subject.derivative_buying_power_usage_percentage).to eq(BigDecimal("20.00"))
+    end
+
+    context "with zero derivative buying power" do
+      let(:balance_data) do
+        {
+          "account-number" => "5WX12345",
+          "derivative-buying-power" => "0",
+          "available-trading-funds" => "0"
+        }
+      end
+
+      it "returns zero" do
+        expect(subject.derivative_buying_power_usage_percentage).to eq(BigDecimal("0"))
+      end
+    end
+  end
+
+  describe "#day_trading_buying_power_usage_percentage" do
+    it "calculates day trading BP usage correctly" do
+      # Used BP = 40000 - 12000 = 28000
+      # Percentage = 28000 / 40000 * 100 = 70%
+      expect(subject.day_trading_buying_power_usage_percentage).to eq(BigDecimal("70.00"))
+    end
+  end
+
+  describe "#minimum_buying_power" do
+    it "returns the smallest buying power value" do
+      # Min of 20000, 15000, 40000 = 15000
+      expect(subject.minimum_buying_power).to eq(BigDecimal("15000.00"))
+    end
+  end
+
+  describe "#sufficient_buying_power?" do
+    context "with equity buying power" do
+      it "returns true when amount is less than available BP" do
+        expect(subject.sufficient_buying_power?(10000)).to be true
+        expect(subject.sufficient_buying_power?("10000.00")).to be true
+      end
+
+      it "returns false when amount exceeds available BP" do
+        expect(subject.sufficient_buying_power?(25000)).to be false
+      end
+
+      it "returns true when amount equals available BP" do
+        expect(subject.sufficient_buying_power?(20000)).to be true
+      end
+    end
+
+    context "with derivative buying power" do
+      it "checks against derivative BP when specified" do
+        expect(subject.sufficient_buying_power?(10000, buying_power_type: :derivative)).to be true
+        expect(subject.sufficient_buying_power?(20000, buying_power_type: :derivative)).to be false
+      end
+    end
+
+    context "with day trading buying power" do
+      it "checks against day trading BP when specified" do
+        expect(subject.sufficient_buying_power?(35000, buying_power_type: :day_trading)).to be true
+        expect(subject.sufficient_buying_power?(45000, buying_power_type: :day_trading)).to be false
+      end
+    end
+  end
+
+  describe "#buying_power_impact_percentage" do
+    context "with equity buying power" do
+      it "calculates impact percentage correctly" do
+        # 5000 / 20000 * 100 = 25%
+        expect(subject.buying_power_impact_percentage(5000)).to eq(BigDecimal("25.00"))
+      end
+
+      it "handles string amounts" do
+        expect(subject.buying_power_impact_percentage("5000.00")).to eq(BigDecimal("25.00"))
+      end
+    end
+
+    context "with derivative buying power" do
+      it "calculates against derivative BP when specified" do
+        # 3000 / 15000 * 100 = 20%
+        expect(subject.buying_power_impact_percentage(3000, buying_power_type: :derivative))
+          .to eq(BigDecimal("20.00"))
+      end
+    end
+
+    context "with zero buying power" do
+      let(:balance_data) do
+        {
+          "account-number" => "5WX12345",
+          "equity-buying-power" => "0",
+          "available-trading-funds" => "0"
+        }
+      end
+
+      it "returns zero" do
+        expect(subject.buying_power_impact_percentage(1000)).to eq(BigDecimal("0"))
+      end
+    end
+  end
 end
