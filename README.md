@@ -148,6 +148,12 @@ tastytrade positions --symbol AAPL
 # Filter positions by underlying symbol (for options)
 tastytrade positions --underlying-symbol SPY
 
+# View trading status and permissions
+tastytrade trading_status
+
+# View status for specific account
+tastytrade trading_status --account 5WT0001
+
 # Include closed positions
 tastytrade positions --include-closed
 ```

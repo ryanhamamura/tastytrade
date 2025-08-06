@@ -159,17 +159,45 @@ RSpec.describe Tastytrade::Models::Account do
       {
         "data" => {
           "account-number" => "5WT0001",
-          "is-pattern-day-trader" => false
+          "equities-margin-calculation-type" => "REG_T",
+          "fee-schedule-name" => "standard",
+          "futures-margin-rate-multiplier" => "1.0",
+          "has-intraday-equities-margin" => false,
+          "id" => 123456,
+          "is-aggregated-at-clearing" => false,
+          "is-closed" => false,
+          "is-closing-only" => false,
+          "is-cryptocurrency-enabled" => true,
+          "is-frozen" => false,
+          "is-full-equity-margin-required" => false,
+          "is-futures-closing-only" => false,
+          "is-futures-intra-day-enabled" => true,
+          "is-futures-enabled" => true,
+          "is-in-day-trade-equity-maintenance-call" => false,
+          "is-in-margin-call" => false,
+          "is-pattern-day-trader" => false,
+          "is-small-notional-futures-intra-day-enabled" => false,
+          "is-roll-the-day-forward-enabled" => true,
+          "are-far-otm-net-options-restricted" => false,
+          "options-level" => "Level 2",
+          "short-calls-enabled" => false,
+          "small-notional-futures-margin-rate-multiplier" => "1.0",
+          "is-equity-offering-enabled" => true,
+          "is-equity-offering-closing-only" => false,
+          "updated-at" => "2024-01-15T10:30:00Z"
         }
       }
     end
 
-    it "returns trading status data" do
+    it "returns a TradingStatus object" do
       allow(session).to receive(:get).with("/accounts/5WT0001/trading-status/").and_return(status_data)
 
       status = account.get_trading_status(session)
 
-      expect(status).to eq(status_data["data"])
+      expect(status).to be_a(Tastytrade::Models::TradingStatus)
+      expect(status.account_number).to eq("5WT0001")
+      expect(status.is_pattern_day_trader).to eq(false)
+      expect(status.options_level).to eq("Level 2")
     end
   end
 

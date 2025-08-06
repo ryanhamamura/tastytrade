@@ -63,9 +63,10 @@ module Tastytrade
       # Get trading status
       #
       # @param session [Tastytrade::Session] Active session
-      # @return [Hash] Trading status data
+      # @return [Tastytrade::Models::TradingStatus] Trading status object
       def get_trading_status(session)
-        session.get("/accounts/#{account_number}/trading-status/")["data"]
+        response = session.get("/accounts/#{account_number}/trading-status/")
+        TradingStatus.new(response["data"])
       end
 
       # Place an order

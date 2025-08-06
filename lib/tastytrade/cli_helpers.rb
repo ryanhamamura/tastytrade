@@ -133,6 +133,90 @@ module Tastytrade
       end
     end
 
+    # Display trading status information
+    def display_trading_status(status)
+      puts "\n#{pastel.bold("Trading Status for Account:")} #{status.account_number}"
+      puts pastel.dim("─" * 60)
+
+      # Display restrictions first if any
+      restrictions = status.active_restrictions
+      if restrictions.any?
+        puts "\n#{pastel.bold.red("⚠ Account Restrictions:")}"
+        restrictions.each do |restriction|
+          case restriction
+          when "Margin Call", "Day Trade Equity Maintenance Call"
+            puts "  #{pastel.red("• #{restriction}")}"
+          when "Pattern Day Trader"
+            puts "  #{pastel.yellow("• #{restriction}")}"
+          when "Account Closed", "Account Frozen"
+            puts "  #{pastel.bright_red("• #{restriction}")}"
+          else
+            puts "  #{pastel.yellow("• #{restriction}")}"
+          end
+        end
+      else
+        puts "\n#{pastel.green("✓ No account restrictions")}"
+      end
+
+      # Display trading permissions
+      puts "\n#{pastel.bold("Trading Permissions:")}"
+      permissions = status.permissions_summary
+
+      # Options trading
+      options_status = permissions[:options]
+      options_color = options_status == "Disabled" ? :dim : :green
+      puts "  Options Trading:      #{pastel.send(options_color, options_status)}"
+
+      # Short calls
+      short_calls_status = permissions[:short_calls]
+      short_calls_color = short_calls_status == "Enabled" ? :green : :dim
+      puts "  Short Calls:          #{pastel.send(short_calls_color, short_calls_status)}"
+
+      # Futures trading
+      futures_status = permissions[:futures]
+      futures_color = case futures_status
+                      when "Enabled" then :green
+                      when "Closing Only" then :yellow
+                      else :dim
+      end
+      puts "  Futures Trading:      #{pastel.send(futures_color, futures_status)}"
+
+      # Cryptocurrency trading
+      crypto_status = permissions[:cryptocurrency]
+      crypto_color = case crypto_status
+                     when "Enabled" then :green
+                     when "Closing Only" then :yellow
+                     else :dim
+      end
+      puts "  Cryptocurrency:       #{pastel.send(crypto_color, crypto_status)}"
+
+      # Portfolio margin
+      pm_status = permissions[:portfolio_margin]
+      pm_color = pm_status == "Enabled" ? :green : :dim
+      puts "  Portfolio Margin:     #{pastel.send(pm_color, pm_status)}"
+
+      # Display account characteristics
+      puts "\n#{pastel.bold("Account Characteristics:")}"
+      pdt_status = permissions[:pattern_day_trader] == "Yes" ? pastel.yellow("Yes") : pastel.dim("No")
+      puts "  Pattern Day Trader:   #{pdt_status}"
+
+      if status.day_trade_count && status.day_trade_count > 0
+        puts "  Day Trade Count:      #{pastel.cyan(status.day_trade_count.to_s)}"
+      end
+
+      if status.pdt_reset_on
+        puts "  PDT Reset Date:       #{pastel.yellow(status.pdt_reset_on.strftime("%Y-%m-%d"))}"
+      end
+
+      # Display additional info
+      puts "\n#{pastel.bold("Additional Information:")}"
+      puts "  Fee Schedule:         #{pastel.cyan(status.fee_schedule_name)}"
+      puts "  Margin Type:          #{pastel.cyan(status.equities_margin_calculation_type)}"
+      puts "  Last Updated:         #{pastel.dim(status.updated_at.strftime("%Y-%m-%d %H:%M:%S %Z"))}"
+
+      puts ""
+    end
+
     private
 
     def load_session
