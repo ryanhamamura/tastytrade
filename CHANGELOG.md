@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Account trading status and permissions (#10)
+  - TradingStatus model with 35+ fields matching Python SDK structure
+  - Complete account state tracking (frozen, closed, margin call, PDT status)
+  - Trading permissions for options, futures, cryptocurrency, and short calls
+  - Options trading level parsing and validation
+  - Pattern Day Trader (PDT) status with reset dates and day trade counts
+  - Portfolio margin and risk-reducing mode indicators
+  - Account restrictions detection and listing
+  - Helper methods for permission checking (can_trade_options?, can_trade_futures?, etc.)
+  - CLI `trading_status` command with color-coded warnings
+  - Visual indicators for account restrictions and margin calls
+  - Display of fee schedule and margin calculation type
+  - Full test coverage for all trading status features
 - Claude command for planning multi-issue implementations
   - `.claude/commands/plan.md` command for structured issue planning
   - Spawns concurrent subagents to research codebase, Python SDK, and CLI

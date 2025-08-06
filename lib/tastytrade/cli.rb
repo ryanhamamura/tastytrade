@@ -433,6 +433,29 @@ module Tastytrade
       exit 1
     end
 
+    desc "trading_status", "Display account trading status and permissions"
+    option :account, type: :string, desc: "Account number (uses default if not specified)"
+    def trading_status
+      require_authentication!
+
+      account = if options[:account]
+        Tastytrade::Models::Account.get(current_session, options[:account])
+      else
+        current_account || select_account_interactively
+      end
+
+      return unless account
+
+      trading_status = account.get_trading_status(current_session)
+      display_trading_status(trading_status)
+    rescue Tastytrade::Error => e
+      error "Failed to fetch trading status: #{e.message}"
+      exit 1
+    rescue StandardError => e
+      error "Unexpected error: #{e.message}"
+      exit 1
+    end
+
     desc "history", "Display transaction history"
     option :account, type: :string, desc: "Account number (uses default if not specified)"
     option :start_date, type: :string, desc: "Start date (YYYY-MM-DD)"
