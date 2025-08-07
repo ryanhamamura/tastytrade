@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Order cancellation and replacement functionality (#12)
+  - LiveOrder model for parsing existing orders from API
+  - OrderStatus module with status constants and validation helpers
+  - Account#get_live_orders method with status/symbol/time filtering
+  - Account#cancel_order method with proper error handling
+  - Account#replace_order method with partial fill support
+  - Custom exceptions for order operations (OrderNotCancellableError, OrderAlreadyFilledError, etc.)
+  - CLI `order` subcommands structure with list/cancel/replace operations
+  - `order list` command with real-time order display and status filtering
+  - `order cancel` command with confirmation prompt and order details
+  - `order replace` command with interactive price/quantity modification
+  - Partial fill tracking with filled/remaining quantity calculations
+  - Order status color coding in CLI output
+  - VCR test configuration with sensitive data filtering
+  - Comprehensive test coverage for all order management features
+  - Integration tests for complete order lifecycle (place, list, modify, cancel)
+  - Renamed existing `order` command to `place` for clarity
 - Account trading status and permissions (#10)
   - TradingStatus model with 35+ fields matching Python SDK structure
   - Complete account state tracking (frozen, closed, margin call, PDT status)

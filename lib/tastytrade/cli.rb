@@ -6,6 +6,7 @@ require "bigdecimal"
 require_relative "cli_helpers"
 require_relative "cli_config"
 require_relative "session_manager"
+require_relative "cli/orders"
 
 module Tastytrade
   # Main CLI class for Tastytrade gem
@@ -677,7 +678,11 @@ module Tastytrade
       interactive_mode
     end
 
-    desc "order SYMBOL QUANTITY", "Place an order for equities"
+    # Register the Orders subcommand
+    desc "order SUBCOMMAND ...ARGS", "Manage orders"
+    subcommand "order", CLI::Orders
+
+    desc "place SYMBOL QUANTITY", "Place an order for equities"
     option :type, default: "market", desc: "Order type (market or limit)"
     option :price, type: :numeric, desc: "Price for limit orders"
     option :action, default: "buy", desc: "Order action (buy or sell)"
@@ -686,18 +691,18 @@ module Tastytrade
     # Place an order for equities
     #
     # @example Place a market buy order
-    #   tastytrade order AAPL 100
+    #   tastytrade place AAPL 100
     #
     # @example Place a limit buy order
-    #   tastytrade order AAPL 100 --type limit --price 150.50
+    #   tastytrade place AAPL 100 --type limit --price 150.50
     #
     # @example Place a sell order
-    #   tastytrade order AAPL 100 --action sell
+    #   tastytrade place AAPL 100 --action sell
     #
     # @example Dry run an order
-    #   tastytrade order AAPL 100 --dry-run
+    #   tastytrade place AAPL 100 --dry-run
     #
-    def order(symbol, quantity)
+    def place(symbol, quantity)
       require_authentication!
 
       # Get the account to use

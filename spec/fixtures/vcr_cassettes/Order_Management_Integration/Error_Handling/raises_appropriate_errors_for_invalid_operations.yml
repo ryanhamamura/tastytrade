@@ -1,0 +1,99 @@
+---
+http_interactions:
+- request:
+    method: post
+    uri: https://api.cert.tastyworks.com/sessions
+    body:
+      encoding: UTF-8
+      string: '{"login":"test_user","remember-me":false,"password":"<PASSWORD>"}'
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+  response:
+    status:
+      code: 401
+      message: Unauthorized
+    headers:
+      Date:
+      - Thu, 07 Aug 2025 00:32:13 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Set-Cookie:
+      - AWSALB=Gl8yPHQcniazGreBJuBlejhUeSJsSxWzXRTV5L5iP7wnQByY5/owbvFazizSJ8xXyzfSfEoimKXsSZ2mn5YEkWpbCf64B0j+falZwZzegmUfYIzuaz1waPvWOYcM;
+        Expires=Thu, 14 Aug 2025 00:32:13 GMT; Path=/
+      - AWSALBCORS=Gl8yPHQcniazGreBJuBlejhUeSJsSxWzXRTV5L5iP7wnQByY5/owbvFazizSJ8xXyzfSfEoimKXsSZ2mn5YEkWpbCf64B0j+falZwZzegmUfYIzuaz1waPvWOYcM;
+        Expires=Thu, 14 Aug 2025 00:32:13 GMT; Path=/; SameSite=None; Secure
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Access-Control-Allow-Headers:
+      - Accept-Version,Authorization,Cache-Control,Content-Type,If-Modified-Since,Keep-Alive,User-Agent,X-Castle-Request-Token,X-Forwarded-For,X-Real-IP,X-Request-Id,X-Requested-With,X-Tastyworks-OTP
+      Access-Control-Allow-Methods:
+      - GET, POST, OPTIONS, PUT, PATCH, DELETE
+      Access-Control-Expose-Headers:
+      - X-Tastyworks-OTP
+    body:
+      encoding: UTF-8
+      string: '{"error":{"code":"invalid_credentials","message":"Invalid login, please
+        check your username and password. Unique customer support identifier: 3e0ee09e3635d8035a8df4da23caeac2"}}'
+  recorded_at: Thu, 07 Aug 2025 00:32:13 GMT
+- request:
+    method: post
+    uri: https://api.cert.tastyworks.com/sessions
+    body:
+      encoding: UTF-8
+      string: '{"login":"test_user","remember-me":false,"password":"<PASSWORD>"}'
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+  response:
+    status:
+      code: 401
+      message: Unauthorized
+    headers:
+      Date:
+      - Thu, 07 Aug 2025 00:32:14 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Set-Cookie:
+      - AWSALB=GhFaRAo18TI+uQioYrYl7DvedELEAcxxzC8REAS3u/d/LpQIifeLY1jk6IkrRDHNob+JdI9uhjukIZTf2cr89anpQAj416Hi+BXUW9mA+dqEPMSuPEWeB1oXQ7Rs;
+        Expires=Thu, 14 Aug 2025 00:32:13 GMT; Path=/
+      - AWSALBCORS=GhFaRAo18TI+uQioYrYl7DvedELEAcxxzC8REAS3u/d/LpQIifeLY1jk6IkrRDHNob+JdI9uhjukIZTf2cr89anpQAj416Hi+BXUW9mA+dqEPMSuPEWeB1oXQ7Rs;
+        Expires=Thu, 14 Aug 2025 00:32:13 GMT; Path=/; SameSite=None; Secure
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Access-Control-Allow-Headers:
+      - Accept-Version,Authorization,Cache-Control,Content-Type,If-Modified-Since,Keep-Alive,User-Agent,X-Castle-Request-Token,X-Forwarded-For,X-Real-IP,X-Request-Id,X-Requested-With,X-Tastyworks-OTP
+      Access-Control-Allow-Methods:
+      - GET, POST, OPTIONS, PUT, PATCH, DELETE
+      Access-Control-Expose-Headers:
+      - X-Tastyworks-OTP
+    body:
+      encoding: UTF-8
+      string: '{"error":{"code":"invalid_credentials","message":"Invalid login, please
+        check your username and password. Unique customer support identifier: 9dc695504014db8c7df7a88cb1631ed9"}}'
+  recorded_at: Thu, 07 Aug 2025 00:32:14 GMT
+recorded_with: VCR 6.3.1

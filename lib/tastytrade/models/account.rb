@@ -100,6 +100,55 @@ module Tastytrade
         Transaction.get_all(session, account_number, **options)
       end
 
+      # Get live orders (open and orders from last 24 hours)
+      #
+      # @param session [Tastytrade::Session] Active session
+      # @param status [String, nil] Filter by order status
+      # @param underlying_symbol [String, nil] Filter by underlying symbol
+      # @param from_time [Time, nil] Start time for order history
+      # @param to_time [Time, nil] End time for order history
+      # @return [Array<LiveOrder>] Array of live orders
+      def get_live_orders(session, status: nil, underlying_symbol: nil, from_time: nil, to_time: nil)
+        params = {}
+        params["status"] = status if status && OrderStatus.valid?(status)
+        params["underlying-symbol"] = underlying_symbol if underlying_symbol
+        params["from-time"] = from_time.iso8601 if from_time
+        params["to-time"] = to_time.iso8601 if to_time
+
+        response = session.get("/accounts/#{account_number}/orders/live/", params)
+        response["data"]["items"].map { |item| LiveOrder.new(item) }
+      end
+
+      # Cancel an order
+      #
+      # @param session [Tastytrade::Session] Active session
+      # @param order_id [String] Order ID to cancel
+      # @return [void]
+      # @raise [OrderNotCancellableError] if order cannot be cancelled
+      # @raise [OrderAlreadyFilledError] if order has already been filled
+      def cancel_order(session, order_id)
+        session.delete("/accounts/#{account_number}/orders/#{order_id}/")
+        nil
+      rescue Tastytrade::Error => e
+        handle_cancel_error(e)
+      end
+
+      # Replace an existing order
+      #
+      # @param session [Tastytrade::Session] Active session
+      # @param order_id [String] Order ID to replace
+      # @param new_order [Tastytrade::Order] New order to replace with
+      # @return [OrderResponse] Response from order replacement
+      # @raise [OrderNotEditableError] if order cannot be edited
+      # @raise [InsufficientQuantityError] if trying to replace more than remaining quantity
+      def replace_order(session, order_id, new_order)
+        response = session.put("/accounts/#{account_number}/orders/#{order_id}/",
+                                new_order.to_api_params)
+        OrderResponse.new(response["data"])
+      rescue Tastytrade::Error => e
+        handle_replace_error(e)
+      end
+
       def closed?
         @is_closed == true
       end
@@ -117,6 +166,26 @@ module Tastytrade
       end
 
       private
+
+      def handle_cancel_error(error)
+        if error.message.include?("already filled") || error.message.include?("Filled")
+          raise OrderAlreadyFilledError, "Order has already been filled and cannot be cancelled"
+        elsif error.message.include?("not cancellable") || error.message.include?("Cannot cancel")
+          raise OrderNotCancellableError, "Order is not in a cancellable state"
+        else
+          raise error
+        end
+      end
+
+      def handle_replace_error(error)
+        if error.message.include?("not editable") || error.message.include?("Cannot edit")
+          raise OrderNotEditableError, "Order is not in an editable state"
+        elsif error.message.include?("insufficient quantity") || error.message.include?("exceeds remaining")
+          raise InsufficientQuantityError, "Cannot replace order with quantity exceeding remaining amount"
+        else
+          raise error
+        end
+      end
 
       def parse_attributes
         parse_basic_attributes
