@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Comprehensive order validation framework (#14)
+  - OrderValidator class with multi-layer validation checks
+  - Symbol validation via Instruments API
+  - Quantity validation with min/max constraints (1-999,999)
+  - Price validation with tick size rounding
+  - Account permissions validation using TradingStatus
+  - Buying power validation via dry-run API calls
+  - Market hours validation with warnings
+  - Specific error classes (OrderValidationError, InvalidSymbolError, etc.)
+  - Integration into Account#place_order method
+  - Order#validate! and Order#dry_run helper methods
+  - CLI `order place` command with validation support
+  - Dry-run mode for testing orders without submission
+  - Confirmation prompts with buying power impact display
+  - Comprehensive test coverage for all validation scenarios
 - Enhanced order status and history functionality (#13)
   - Account#get_order_history method for retrieving orders beyond 24 hours
   - Account#get_order method for fetching individual order details

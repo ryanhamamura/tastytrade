@@ -69,13 +69,36 @@ module Tastytrade
         TradingStatus.new(response["data"])
       end
 
-      # Place an order
+      # Places an order for this account with comprehensive validation.
+      # By default, performs full validation including symbol checks, quantity limits,
+      # price validation, account permissions, and buying power verification.
       #
       # @param session [Tastytrade::Session] Active session
       # @param order [Tastytrade::Order] Order to place
       # @param dry_run [Boolean] Whether to simulate the order without placing it
-      # @return [OrderResponse] Response from order placement
-      def place_order(session, order, dry_run: false)
+      # @param skip_validation [Boolean] Skip pre-submission validation (use with caution)
+      # @return [OrderResponse] Response from order placement with order ID and status
+      # @raise [OrderValidationError] if validation fails with detailed error messages
+      # @raise [InsufficientFundsError] if account lacks buying power
+      # @raise [MarketClosedError] if market is closed
+      #
+      # @example Place an order with validation
+      #   response = account.place_order(session, order)
+      #   puts response.order_id
+      #
+      # @example Dry-run to check buying power
+      #   response = account.place_order(session, order, dry_run: true)
+      #   puts response.buying_power_effect
+      #
+      # @example Skip validation when certain order is valid
+      #   response = account.place_order(session, order, skip_validation: true)
+      def place_order(session, order, dry_run: false, skip_validation: false)
+        # Validate the order unless explicitly skipped or it's a dry-run
+        unless skip_validation || dry_run
+          validator = OrderValidator.new(session, self, order)
+          validator.validate!
+        end
+
         endpoint = "/accounts/#{account_number}/orders"
         endpoint += "/dry-run" if dry_run
 

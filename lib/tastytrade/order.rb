@@ -91,6 +91,44 @@ module Tastytrade
       @type == OrderType::LIMIT
     end
 
+    def stop?
+      @type == OrderType::STOP
+    end
+
+    # Validates this order for a specific account using the OrderValidator.
+    # Performs comprehensive checks including symbol existence, quantity constraints,
+    # price validation, account permissions, and optionally buying power.
+    #
+    # @param session [Tastytrade::Session] Active session
+    # @param account [Tastytrade::Models::Account] Account to validate against
+    # @param skip_dry_run [Boolean] Skip dry-run validation for performance
+    # @return [Boolean] true if valid
+    # @raise [OrderValidationError] if validation fails with detailed error messages
+    #
+    # @example
+    #   order.validate!(session, account)  # Full validation including dry-run
+    #   order.validate!(session, account, skip_dry_run: true)  # Skip buying power check
+    def validate!(session, account, skip_dry_run: false)
+      validator = OrderValidator.new(session, account, self)
+      validator.validate!(skip_dry_run: skip_dry_run)
+    end
+
+    # Performs a dry-run validation of the order. This submits the order to the API
+    # in dry-run mode to check buying power, margin requirements, and get warnings
+    # without actually placing the order.
+    #
+    # @param session [Tastytrade::Session] Active session
+    # @param account [Tastytrade::Models::Account] Account to validate against
+    # @return [Tastytrade::Models::OrderResponse] Dry-run response with buying power effect
+    #
+    # @example
+    #   response = order.dry_run(session, account)
+    #   puts response.buying_power_effect
+    #   puts response.warnings
+    def dry_run(session, account)
+      account.place_order(session, self, dry_run: true)
+    end
+
     def to_api_params
       params = {
         "order-type" => @type,
