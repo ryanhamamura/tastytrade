@@ -15,6 +15,7 @@ module Tastytrade
       option :status, type: :string, desc: "Filter by status (Live, Filled, Cancelled, etc.)"
       option :symbol, type: :string, desc: "Filter by underlying symbol"
       option :all, type: :boolean, default: false, desc: "Show orders for all accounts"
+      option :format, type: :string, desc: "Output format (table, json)", default: "table"
       def list
         require_authentication!
 
@@ -47,11 +48,21 @@ module Tastytrade
         # Sort by created_at desc (most recent first)
         all_orders.sort! { |a, b| (b[1].created_at || Time.now) <=> (a[1].created_at || Time.now) }
 
-        # Fetch market data for unique symbols
-        unique_symbols = all_orders.map { |_, order| order.underlying_symbol }.uniq.compact
-        market_data = fetch_market_data(unique_symbols) if unique_symbols.any?
+        if options[:format] == "json"
+          # Output as JSON
+          output = all_orders.map do |account, order|
+            order_hash = order.to_h
+            order_hash[:account_number] = account.account_number if options[:all]
+            order_hash
+          end
+          puts JSON.pretty_generate(output)
+        else
+          # Fetch market data for unique symbols
+          unique_symbols = all_orders.map { |_, order| order.underlying_symbol }.uniq.compact
+          market_data = fetch_market_data(unique_symbols) if unique_symbols.any?
 
-        display_orders(all_orders, market_data, show_account: options[:all])
+          display_orders(all_orders, market_data, show_account: options[:all])
+        end
       end
 
       desc "cancel ORDER_ID", "Cancel an order"
@@ -117,6 +128,86 @@ module Tastytrade
           exit 1
         rescue Tastytrade::Error => e
           error "Failed to cancel order: #{e.message}"
+          exit 1
+        end
+      end
+
+      desc "history", "List order history (orders older than 24 hours)"
+      option :status, type: :string, desc: "Filter by status (Filled, Cancelled, Expired, etc.)"
+      option :symbol, type: :string, desc: "Filter by underlying symbol"
+      option :from, type: :string, desc: "From date (YYYY-MM-DD)"
+      option :to, type: :string, desc: "To date (YYYY-MM-DD)"
+      option :account, type: :string, desc: "Account number (uses default if not specified)"
+      option :format, type: :string, desc: "Output format (table, json)", default: "table"
+      option :limit, type: :numeric, desc: "Maximum number of orders to retrieve", default: 100
+      def history
+        require_authentication!
+
+        account = if options[:account]
+          Tastytrade::Models::Account.get(current_session, options[:account])
+        else
+          current_account || select_account_interactively
+        end
+
+        return unless account
+
+        # Parse date filters
+        from_time = Time.parse(options[:from]) if options[:from]
+        to_time = Time.parse(options[:to]) if options[:to]
+        # Set to end of day if only date was provided
+        to_time = to_time + (24 * 60 * 60) - 1 if to_time && to_time.hour == 0 && to_time.min == 0
+
+        info "Fetching order history for account #{account.account_number}..."
+
+        orders = account.get_order_history(
+          current_session,
+          status: options[:status],
+          underlying_symbol: options[:symbol],
+          from_time: from_time,
+          to_time: to_time,
+          page_limit: options[:limit]
+        )
+
+        if orders.empty?
+          info "No historical orders found"
+          return
+        end
+
+        if options[:format] == "json"
+          puts JSON.pretty_generate(orders.map(&:to_h))
+        else
+          # Sort by created_at desc (most recent first)
+          orders.sort! { |a, b| (b.created_at || Time.now) <=> (a.created_at || Time.now) }
+          display_orders(orders.map { |order| [account, order] }, nil, show_account: false)
+        end
+      end
+
+      desc "get ORDER_ID", "Get details for a specific order"
+      option :account, type: :string, desc: "Account number (uses default if not specified)"
+      option :format, type: :string, desc: "Output format (table, json)", default: "table"
+      def get(order_id)
+        require_authentication!
+
+        account = if options[:account]
+          Tastytrade::Models::Account.get(current_session, options[:account])
+        else
+          current_account || select_account_interactively
+        end
+
+        return unless account
+
+        info "Fetching order #{order_id}..."
+
+        begin
+          order = account.get_order(current_session, order_id)
+
+          if options[:format] == "json"
+            puts JSON.pretty_generate(order.to_h)
+          else
+            display_order_details(order)
+          end
+        rescue Tastytrade::Error => e
+          error "Failed to fetch order: #{e.message}"
           exit 1
         end
       end
@@ -273,6 +364,54 @@ module Tastytrade
 
       private
 
+      def display_order_details(order)
+        puts ""
+        puts "Order Details:"
+        puts "  Order ID: #{order.id}"
+        puts "  Account: #{order.account_number}" if order.account_number
+        puts "  Symbol: #{order.underlying_symbol}"
+        puts "  Type: #{order.order_type}"
+        puts "  Status: #{colorize_status(order.status)}"
+        puts "  Time in Force: #{order.time_in_force}"
+        puts "  Price: #{format_currency(order.price)}" if order.price
+        puts "  Stop Price: #{format_currency(order.stop_trigger)}" if order.stop_trigger
+        puts ""
+
+        if order.legs.any?
+          puts "Legs:"
+          order.legs.each_with_index do |leg, i|
+            puts "  Leg #{i + 1}:"
+            puts "    Symbol: #{leg.symbol}"
+            puts "    Action: #{leg.action}"
+            puts "    Quantity: #{leg.quantity}"
+            puts "    Remaining: #{leg.remaining_quantity}"
+            puts "    Filled: #{leg.filled_quantity}"
+
+            if leg.fills.any?
+              puts "    Fills:"
+              leg.fills.each do |fill|
+                puts "      #{fill.quantity} @ #{format_currency(fill.fill_price)} at #{format_time(fill.filled_at)}"
+              end
+            end
+          end
+        end
+
+        puts ""
+        puts "Timestamps:"
+        puts "  Created: #{format_timestamp(order.created_at)}" if order.created_at
+        puts "  Updated: #{format_timestamp(order.updated_at)}" if order.updated_at
+        puts "  Filled: #{format_timestamp(order.filled_at)}" if order.filled_at
+        puts "  Cancelled: #{format_timestamp(order.cancelled_at)}" if order.cancelled_at
+        puts "  Expired: #{format_timestamp(order.expired_at)}" if order.expired_at
+
+        puts ""
+        puts "Status Flags:"
+        puts "  Cancellable: #{order.cancellable? ? "Yes" : "No"}"
+        puts "  Editable: #{order.editable? ? "Yes" : "No"}"
+        puts "  Terminal: #{order.terminal? ? "Yes" : "No"}"
+        puts "  Working: #{order.working? ? "Yes" : "No"}"
+      end
+
       def display_orders(orders_with_accounts, market_data, show_account: false)
         headers = ["Order ID", "Symbol", "Action", "Qty", "Filled", "Type", "Price", "Status", "Time"]
         headers.unshift("Account") if show_account
@@ -355,6 +494,11 @@ module Tastytrade
       def format_time(time)
         return "N/A" unless time
         time.strftime("%m/%d %H:%M")
+      end
+
+      def format_timestamp(time)
+        return "N/A" unless time
+        time.strftime("%Y-%m-%d %H:%M:%S")
       end
 
       def format_currency(amount)
