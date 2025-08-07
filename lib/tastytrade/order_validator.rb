@@ -4,9 +4,24 @@ require "bigdecimal"
 require "time"
 
 module Tastytrade
-  # Validates orders before submission to ensure they meet all requirements
+  # Validates orders before submission to ensure they meet all requirements.
+  # Performs comprehensive checks including symbol validation, quantity constraints,
+  # price validation, account permissions, buying power, and market hours.
+  #
+  # @example Basic usage
+  #   validator = OrderValidator.new(session, account, order)
+  #   validator.validate! # Raises OrderValidationError if invalid
+  #
+  # @example With dry-run validation
+  #   validator = OrderValidator.new(session, account, order)
+  #   response = validator.dry_run_validate!
+  #   puts validator.warnings if validator.warnings.any?
   class OrderValidator
-    attr_reader :errors, :warnings
+    # @return [Array<String>] List of validation errors
+    attr_reader :errors
+
+    # @return [Array<String>] List of validation warnings
+    attr_reader :warnings
 
     # Common tick sizes for different price ranges
     TICK_SIZES = {
@@ -19,6 +34,11 @@ module Tastytrade
     MIN_QUANTITY = 1
     MAX_QUANTITY = 999_999
 
+    # Creates a new OrderValidator instance
+    #
+    # @param session [Tastytrade::Session] Active trading session
+    # @param account [Tastytrade::Models::Account] Account to validate against
+    # @param order [Tastytrade::Order] Order to validate
     def initialize(session, account, order)
       @session = session
       @account = account
@@ -29,11 +49,13 @@ module Tastytrade
       @dry_run_response = nil
     end
 
-    # Perform comprehensive order validation
+    # Performs comprehensive order validation including structure, symbols,
+    # quantities, prices, account permissions, market hours, and optionally
+    # buying power via dry-run.
     #
     # @param skip_dry_run [Boolean] Skip the dry-run validation (for performance)
     # @return [Boolean] true if validation passes
-    # @raise [OrderValidationError] if validation fails
+    # @raise [OrderValidationError] if validation fails with detailed error messages
     def validate!(skip_dry_run: false)
       # Reset errors and warnings
       @errors = []
@@ -54,9 +76,10 @@ module Tastytrade
       true
     end
 
-    # Perform pre-flight validation via dry-run
+    # Performs pre-flight validation via dry-run API call. This checks buying power,
+    # margin requirements, and API-level validation rules without placing the order.
     #
-    # @return [OrderResponse, nil] Dry-run response if successful
+    # @return [Tastytrade::Models::OrderResponse, nil] Dry-run response if successful, nil if failed
     def dry_run_validate!
       @dry_run_response = @account.place_order(@session, @order, dry_run: true)
 
