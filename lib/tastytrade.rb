@@ -32,6 +32,10 @@ module Tastytrade
   class InvalidOrderError < OrderError; end
   class InsufficientFundsError < OrderError; end
   class MarketClosedError < OrderError; end
+  class OrderNotCancellableError < OrderError; end
+  class OrderAlreadyFilledError < OrderError; end
+  class OrderNotEditableError < OrderError; end
+  class InsufficientQuantityError < OrderError; end
 
   # API URLs
   API_URL = "https://api.tastyworks.com"

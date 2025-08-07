@@ -196,21 +196,42 @@ tastytrade buying_power --account 5WX12345
 
 ```bash
 # Place a market buy order
-tastytrade order AAPL 100
+tastytrade place AAPL 100
 
 # Place a limit buy order
-tastytrade order AAPL 100 --type limit --price 150.50
+tastytrade place AAPL 100 --type limit --price 150.50
 
 # Place a sell order
-tastytrade order AAPL 100 --action sell
+tastytrade place AAPL 100 --action sell
 
 # Dry run an order (simulate without placing)
-tastytrade order AAPL 100 --dry-run
+tastytrade place AAPL 100 --dry-run
 
 # Place order on specific account
-tastytrade order AAPL 100 --account 5WX12345
+tastytrade place AAPL 100 --account 5WX12345
 
 # Note: Orders that would use >80% of buying power will prompt for confirmation
+```
+
+#### Order Management
+
+```bash
+# List all live orders (open + last 24 hours)
+tastytrade order list
+
+# List orders with filters
+tastytrade order list --status Live
+tastytrade order list --symbol AAPL
+tastytrade order list --all  # Show for all accounts
+
+# Cancel an order
+tastytrade order cancel ORDER_ID
+tastytrade order cancel ORDER_ID --account 5WX12345
+
+# Replace/modify an order
+tastytrade order replace ORDER_ID  # Interactive prompts for new price/quantity
+tastytrade order replace ORDER_ID --price 155.00
+tastytrade order replace ORDER_ID --quantity 50
 ```
 
 #### Account Management
@@ -351,6 +372,65 @@ else
 end
 
 puts response.warnings           # => [] or warning messages
+```
+
+### Order Management
+
+```ruby
+# Get live orders (open orders + orders from last 24 hours)
+orders = account.get_live_orders(session)
+
+# Filter orders by status
+live_orders = account.get_live_orders(session, status: "Live")
+filled_orders = account.get_live_orders(session, status: "Filled")
+
+# Filter orders by symbol
+aapl_orders = account.get_live_orders(session, underlying_symbol: "AAPL")
+
+# Filter by time range
+recent_orders = account.get_live_orders(session,
+  from_time: Time.now - 86400,  # Last 24 hours
+  to_time: Time.now
+)
+
+# Work with order details
+orders.each do |order|
+  puts order.id                  # => "12345"
+  puts order.status              # => "Live"
+  puts order.underlying_symbol   # => "AAPL"
+  puts order.order_type          # => "Limit"
+  puts order.price               # => BigDecimal("150.50")
+  
+  # Check order capabilities
+  puts order.cancellable?        # => true
+  puts order.editable?           # => true
+  puts order.terminal?           # => false
+  puts order.working?            # => true
+  
+  # Check fill status
+  puts order.remaining_quantity  # => 100
+  puts order.filled_quantity     # => 0
+  
+  # Work with order legs
+  order.legs.each do |leg|
+    puts leg.symbol              # => "AAPL"
+    puts leg.action              # => "Buy"
+    puts leg.quantity            # => 100
+    puts leg.remaining_quantity  # => 100
+    puts leg.partially_filled?   # => false
+  end
+end
+
+# Cancel an order
+account.cancel_order(session, "12345")
+
+# Replace an order with new parameters
+new_order = Tastytrade::Order.new(
+  type: Tastytrade::OrderType::LIMIT,
+  legs: leg,
+  price: 155.00  # New price
+)
+response = account.replace_order(session, "12345", new_order)
 ```
 
 ### Transaction History
