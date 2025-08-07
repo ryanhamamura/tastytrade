@@ -119,6 +119,40 @@ module Tastytrade
         response["data"]["items"].map { |item| LiveOrder.new(item) }
       end
 
+      # Get order history for this account (beyond 24 hours)
+      #
+      # @param session [Tastytrade::Session] Active session
+      # @param status [String, nil] Filter by order status
+      # @param underlying_symbol [String, nil] Filter by underlying symbol
+      # @param from_time [Time, nil] Start time for order history
+      # @param to_time [Time, nil] End time for order history
+      # @param page_offset [Integer, nil] Pagination offset
+      # @param page_limit [Integer, nil] Number of results per page (default 250, max 1000)
+      # @return [Array<LiveOrder>] Array of historical orders
+      def get_order_history(session, status: nil, underlying_symbol: nil, from_time: nil, to_time: nil,
+                           page_offset: nil, page_limit: nil)
+        params = {}
+        params["status"] = status if status && OrderStatus.valid?(status)
+        params["underlying-symbol"] = underlying_symbol if underlying_symbol
+        params["from-time"] = from_time.iso8601 if from_time
+        params["to-time"] = to_time.iso8601 if to_time
+        params["page-offset"] = page_offset if page_offset
+        params["page-limit"] = page_limit if page_limit
+
+        response = session.get("/accounts/#{account_number}/orders/", params)
+        response["data"]["items"].map { |item| LiveOrder.new(item) }
+      end
+
+      # Get a specific order by ID
+      #
+      # @param session [Tastytrade::Session] Active session
+      # @param order_id [String] Order ID to retrieve
+      # @return [LiveOrder] The requested order
+      def get_order(session, order_id)
+        response = session.get("/accounts/#{account_number}/orders/#{order_id}/")
+        LiveOrder.new(response["data"])
+      end
+
       # Cancel an order
       #
       # @param session [Tastytrade::Session] Active session

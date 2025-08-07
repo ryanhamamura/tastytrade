@@ -192,7 +192,9 @@ tastytrade buying_power
 tastytrade buying_power --account 5WX12345
 ```
 
-#### Order Placement
+#### Order Management
+
+##### Order Placement
 
 ```bash
 # Place a market buy order
@@ -213,7 +215,7 @@ tastytrade place AAPL 100 --account 5WX12345
 # Note: Orders that would use >80% of buying power will prompt for confirmation
 ```
 
-#### Order Management
+##### Order Status and History
 
 ```bash
 # List all live orders (open + last 24 hours)
@@ -223,6 +225,21 @@ tastytrade order list
 tastytrade order list --status Live
 tastytrade order list --symbol AAPL
 tastytrade order list --all  # Show for all accounts
+
+# Output orders in JSON format
+tastytrade order list --format json
+
+# Get historical orders (beyond 24 hours)
+tastytrade order history
+tastytrade order history --status Filled
+tastytrade order history --symbol AAPL
+tastytrade order history --from 2024-01-01 --to 2024-12-31
+tastytrade order history --limit 100
+tastytrade order history --format json
+
+# Get details for a specific order
+tastytrade order get ORDER_ID
+tastytrade order get ORDER_ID --format json
 
 # Cancel an order
 tastytrade order cancel ORDER_ID

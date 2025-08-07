@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Enhanced order status and history functionality (#13)
+  - Account#get_order_history method for retrieving orders beyond 24 hours
+  - Account#get_order method for fetching individual order details
+  - Date range filtering for order history with from/to parameters
+  - Pagination support for large order history queries
+  - JSON output format for all order CLI commands (--format json)
+  - LiveOrder#to_h method for JSON serialization
+  - `order history` CLI command with comprehensive filtering options
+  - `order get` CLI command for detailed single order information
+  - Enhanced display_order_details method showing fills and timestamps
+  - Complete test coverage for new order history methods
 - Order cancellation and replacement functionality (#12)
   - LiveOrder model for parsing existing orders from API
   - OrderStatus module with status constants and validation helpers

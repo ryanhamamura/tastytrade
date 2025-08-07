@@ -58,6 +58,46 @@ module Tastytrade
         @legs.sum { |leg| leg.filled_quantity || 0 }
       end
 
+      # Convert to hash for JSON serialization
+      def to_h
+        {
+          id: @id,
+          account_number: @account_number,
+          status: @status,
+          cancellable: @cancellable,
+          editable: @editable,
+          edited: @edited,
+          time_in_force: @time_in_force,
+          order_type: @order_type,
+          size: @size,
+          price: @price&.to_s("F"),
+          price_effect: @price_effect,
+          underlying_symbol: @underlying_symbol,
+          underlying_instrument_type: @underlying_instrument_type,
+          stop_trigger: @stop_trigger&.to_s("F"),
+          gtc_date: @gtc_date&.to_s,
+          created_at: @created_at&.iso8601,
+          updated_at: @updated_at&.iso8601,
+          received_at: @received_at&.iso8601,
+          routed_at: @routed_at&.iso8601,
+          filled_at: @filled_at&.iso8601,
+          cancelled_at: @cancelled_at&.iso8601,
+          expired_at: @expired_at&.iso8601,
+          rejected_at: @rejected_at&.iso8601,
+          live_at: @live_at&.iso8601,
+          terminal_at: @terminal_at&.iso8601,
+          contingent_status: @contingent_status,
+          confirmation_status: @confirmation_status,
+          reject_reason: @reject_reason,
+          user_tag: @user_tag,
+          preflight_check_result: @preflight_check_result,
+          order_rule: @order_rule,
+          legs: @legs&.map(&:to_h),
+          remaining_quantity: remaining_quantity,
+          filled_quantity: filled_quantity
+        }.compact
+      end
+
       private
 
       def parse_attributes
@@ -149,6 +189,24 @@ module Tastytrade
         !filled? && filled_quantity > 0
       end
 
+      # Convert to hash for JSON serialization
+      def to_h
+        {
+          symbol: @symbol,
+          instrument_type: @instrument_type,
+          action: @action,
+          quantity: @quantity,
+          remaining_quantity: @remaining_quantity,
+          filled_quantity: filled_quantity,
+          fill_quantity: @fill_quantity,
+          fill_price: @fill_price&.to_s("F"),
+          execution_price: @execution_price&.to_s("F"),
+          position_effect: @position_effect,
+          ratio_quantity: @ratio_quantity,
+          fills: @fills&.map(&:to_h)
+        }.compact
+      end
+
       private
 
       def parse_attributes
@@ -179,6 +237,19 @@ module Tastytrade
     class Fill < Base
       attr_reader :ext_exec_id, :ext_group_fill_id, :fill_id, :quantity,
                   :fill_price, :filled_at, :destination_venue
+
+      # Convert to hash for JSON serialization
+      def to_h
+        {
+          ext_exec_id: @ext_exec_id,
+          ext_group_fill_id: @ext_group_fill_id,
+          fill_id: @fill_id,
+          quantity: @quantity,
+          fill_price: @fill_price&.to_s("F"),
+          filled_at: @filled_at&.iso8601,
+          destination_venue: @destination_venue
+        }.compact
+      end
 
       private
 
