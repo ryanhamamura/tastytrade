@@ -219,6 +219,7 @@ module Tastytrade
       option :quantity, type: :numeric, required: true, desc: "Number of shares"
       option :type, type: :string, default: "limit", desc: "Order type (market, limit)"
       option :price, type: :numeric, desc: "Limit price (required for limit orders)"
+      option :time_in_force, type: :string, default: "day", desc: "Order duration (day, gtc)"
       option :dry_run, type: :boolean, default: false, desc: "Perform validation only without placing the order"
       option :skip_confirmation, type: :boolean, default: false, desc: "Skip confirmation prompt"
       def place
@@ -269,6 +270,17 @@ module Tastytrade
           exit 1
         end
 
+        # Map time in force
+        time_in_force = case options[:time_in_force].downcase
+                        when "day", "d"
+                          Tastytrade::OrderTimeInForce::DAY
+                        when "gtc", "g", "good_till_cancelled"
+                          Tastytrade::OrderTimeInForce::GTC
+                        else
+                          error "Invalid time in force. Must be: day or gtc"
+                          exit 1
+        end
+
         # Create the order
         leg = Tastytrade::OrderLeg.new(
           action: action,
@@ -278,6 +290,7 @@ module Tastytrade
 
         order = Tastytrade::Order.new(
           type: order_type,
+          time_in_force: time_in_force,
           legs: leg,
           price: options[:price] ? BigDecimal(options[:price].to_s) : nil
         )
@@ -290,6 +303,7 @@ module Tastytrade
         puts "  Action: #{action}"
         puts "  Quantity: #{options[:quantity]}"
         puts "  Type: #{order_type}"
+        puts "  Time in Force: #{time_in_force}"
         puts "  Price: #{options[:price] ? format_currency(options[:price]) : "Market"}"
         puts ""
 
@@ -581,7 +595,7 @@ module Tastytrade
       end
 
       def display_orders(orders_with_accounts, market_data, show_account: false)
-        headers = ["Order ID", "Symbol", "Action", "Qty", "Filled", "Type", "Price", "Status", "Time"]
+        headers = ["Order ID", "Symbol", "Action", "Qty", "Filled", "Type", "TIF", "Price", "Status", "Time"]
         headers.unshift("Account") if show_account
 
         rows = orders_with_accounts.map do |account, order|
@@ -594,6 +608,7 @@ module Tastytrade
             leg ? leg.quantity.to_s : "N/A",
             leg ? "#{leg.filled_quantity}/#{leg.quantity}" : "N/A",
             order.order_type || "N/A",
+            order.time_in_force || "N/A",
             order.price ? format_currency(order.price) : "N/A",
             colorize_status(order.status),
             format_time(order.created_at)

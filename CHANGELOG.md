@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Order time-in-force CLI support (#15)
+  - Added --time-in-force option to `order place` command
+  - Support for DAY and GTC (Good Till Cancelled) order durations
+  - Accepts shorthand aliases: "d" for DAY, "g" or "good_till_cancelled" for GTC
+  - Defaults to DAY order when not specified (backward compatible)
+  - Display time-in-force in order summaries and order history tables
+  - Added TIF column to order list and history displays
+  - Complete test coverage for time-in-force parameter handling
+  - Note: Core Order class already had full DAY/GTC support
 - Comprehensive order validation framework (#14)
   - OrderValidator class with multi-layer validation checks
   - Symbol validation via Instruments API
