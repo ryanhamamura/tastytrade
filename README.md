@@ -197,20 +197,26 @@ tastytrade buying_power --account 5WX12345
 ##### Order Placement
 
 ```bash
-# Place a market buy order
-tastytrade place AAPL 100
-
 # Place a limit buy order
-tastytrade place AAPL 100 --type limit --price 150.50
+tastytrade order place --symbol AAPL --action buy_to_open --quantity 100 --price 150.50
 
-# Place a sell order
-tastytrade place AAPL 100 --action sell
+# Place a market order
+tastytrade order place --symbol SPY --action buy_to_open --quantity 10 --type market
 
-# Dry run an order (simulate without placing)
-tastytrade place AAPL 100 --dry-run
+# Sell to close a position
+tastytrade order place --symbol AAPL --action sell_to_close --quantity 100 --price 155.00
 
-# Place order on specific account
-tastytrade place AAPL 100 --account 5WX12345
+# Dry-run validation (validate without placing)
+tastytrade order place --symbol MSFT --action buy_to_open --quantity 50 --price 300 --dry-run
+
+# Skip confirmation prompt
+tastytrade order place --symbol TSLA --action buy_to_open --quantity 10 --price 200 --skip-confirmation
+
+# Supported actions:
+# - buy_to_open (bto)
+# - sell_to_close (stc) 
+# - sell_to_open (sto)
+# - buy_to_close (btc)
 
 # Note: Orders that would use >80% of buying power will prompt for confirmation
 ```
@@ -448,6 +454,106 @@ new_order = Tastytrade::Order.new(
   price: 155.00  # New price
 )
 response = account.replace_order(session, "12345", new_order)
+```
+
+### Order Validation
+
+The SDK includes comprehensive order validation to prevent submission errors and ensure orders meet all requirements before reaching the API.
+
+#### Validation Features
+
+```ruby
+# Orders are automatically validated before submission
+order = Tastytrade::Order.new(
+  type: Tastytrade::OrderType::LIMIT,
+  legs: leg,
+  price: 150.00
+)
+
+# Validation happens automatically when placing orders
+begin
+  response = account.place_order(session, order)
+rescue Tastytrade::OrderValidationError => e
+  puts "Validation failed:"
+  e.errors.each { |error| puts "  - #{error}" }
+end
+
+# You can also validate manually
+order.validate!(session, account)  # Raises if invalid
+
+# Or perform a dry-run validation
+dry_run_response = order.dry_run(session, account)
+puts dry_run_response.buying_power_effect
+puts dry_run_response.warnings
+```
+
+#### Validation Rules
+
+The following validations are performed:
+
+1. **Symbol Validation**
+   - Verifies symbol exists and is tradeable
+   - Checks instrument type compatibility
+
+2. **Quantity Validation**
+   - Minimum quantity: 1
+   - Maximum quantity: 999,999
+   - No fractional shares (whole numbers only)
+
+3. **Price Validation**
+   - Price must be positive for limit orders
+   - Price is rounded to appropriate tick size
+   - Price reasonableness checks
+
+4. **Account Permissions**
+   - Validates trading permissions for instrument type
+   - Checks for account restrictions (frozen, closing-only, etc.)
+   - Verifies options/futures permissions if applicable
+
+5. **Buying Power Validation**
+   - Ensures sufficient buying power via dry-run
+   - Warns if order uses >50% of available buying power
+   - Checks margin requirements
+
+6. **Market Hours Validation**
+   - Warns about market orders outside regular hours
+   - Alerts for weekend submissions
+
+#### Validation Errors
+
+```ruby
+# Specific validation error types
+Tastytrade::OrderValidationError     # General validation failure
+Tastytrade::InvalidSymbolError       # Symbol doesn't exist
+Tastytrade::InsufficientBuyingPowerError  # Not enough buying power
+Tastytrade::AccountRestrictedError   # Account has restrictions
+Tastytrade::InvalidQuantityError     # Quantity out of range
+Tastytrade::InvalidPriceError        # Price validation failure
+Tastytrade::MarketClosedError        # Market is closed
+```
+
+#### Using the OrderValidator
+
+```ruby
+# Direct use of OrderValidator for custom validation
+validator = Tastytrade::OrderValidator.new(session, account, order)
+
+# Perform full validation
+validator.validate!  # Raises if invalid
+
+# Or just dry-run validation
+dry_run_response = validator.dry_run_validate!
+
+# Check warnings and errors
+puts validator.warnings  # Array of warning messages
+puts validator.errors    # Array of error messages
+```
+
+#### Skip Validation (Use with Caution)
+
+```ruby
+# Skip validation when you're certain the order is valid
+response = account.place_order(session, order, skip_validation: true)
 ```
 
 ### Transaction History

@@ -91,6 +91,31 @@ module Tastytrade
       @type == OrderType::LIMIT
     end
 
+    def stop?
+      @type == OrderType::STOP
+    end
+
+    # Validate this order for a specific account
+    #
+    # @param session [Tastytrade::Session] Active session
+    # @param account [Tastytrade::Models::Account] Account to validate against
+    # @param skip_dry_run [Boolean] Skip dry-run validation
+    # @return [Boolean] true if valid
+    # @raise [OrderValidationError] if invalid
+    def validate!(session, account, skip_dry_run: false)
+      validator = OrderValidator.new(session, account, self)
+      validator.validate!(skip_dry_run: skip_dry_run)
+    end
+
+    # Perform a dry-run validation
+    #
+    # @param session [Tastytrade::Session] Active session
+    # @param account [Tastytrade::Models::Account] Account to validate against
+    # @return [OrderResponse] Dry-run response
+    def dry_run(session, account)
+      account.place_order(session, self, dry_run: true)
+    end
+
     def to_api_params
       params = {
         "order-type" => @type,

@@ -58,7 +58,7 @@ RSpec.describe "Tastytrade::Models::Account#place_order" do
     end
 
     it "places a market order" do
-      response = account.place_order(session, market_order)
+      response = account.place_order(session, market_order, skip_validation: true)
 
       expect(session).to have_received(:post).with(
         "/accounts/5WX12345/orders",
@@ -71,7 +71,7 @@ RSpec.describe "Tastytrade::Models::Account#place_order" do
     end
 
     it "places a limit order with correct parameters" do
-      response = account.place_order(session, limit_order)
+      response = account.place_order(session, limit_order, skip_validation: true)
 
       expect(session).to have_received(:post).with(
         "/accounts/5WX12345/orders",
@@ -108,7 +108,7 @@ RSpec.describe "Tastytrade::Models::Account#place_order" do
       )
 
       expect {
-        account.place_order(session, market_order)
+        account.place_order(session, market_order, skip_validation: true)
       }.to raise_error(Tastytrade::Error, "Invalid symbol")
     end
 
@@ -118,7 +118,7 @@ RSpec.describe "Tastytrade::Models::Account#place_order" do
       )
 
       expect {
-        account.place_order(session, market_order)
+        account.place_order(session, market_order, skip_validation: true)
       }.to raise_error(Tastytrade::NetworkTimeoutError)
     end
   end

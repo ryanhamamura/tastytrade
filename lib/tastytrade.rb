@@ -15,6 +15,7 @@ require_relative "tastytrade/client"
 require_relative "tastytrade/models"
 require_relative "tastytrade/session"
 require_relative "tastytrade/order"
+require_relative "tastytrade/order_validator"
 require_relative "tastytrade/instruments/equity"
 
 module Tastytrade
@@ -36,6 +37,22 @@ module Tastytrade
   class OrderAlreadyFilledError < OrderError; end
   class OrderNotEditableError < OrderError; end
   class InsufficientQuantityError < OrderError; end
+
+  # Order validation errors
+  class OrderValidationError < OrderError
+    attr_reader :errors
+
+    def initialize(errors)
+      @errors = Array(errors)
+      super(@errors.join("; "))
+    end
+  end
+
+  class InvalidSymbolError < OrderValidationError; end
+  class InsufficientBuyingPowerError < OrderValidationError; end
+  class AccountRestrictedError < OrderValidationError; end
+  class InvalidQuantityError < OrderValidationError; end
+  class InvalidPriceError < OrderValidationError; end
 
   # API URLs
   API_URL = "https://api.tastyworks.com"

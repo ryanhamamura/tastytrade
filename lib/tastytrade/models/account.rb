@@ -74,8 +74,16 @@ module Tastytrade
       # @param session [Tastytrade::Session] Active session
       # @param order [Tastytrade::Order] Order to place
       # @param dry_run [Boolean] Whether to simulate the order without placing it
+      # @param skip_validation [Boolean] Skip pre-submission validation (use with caution)
       # @return [OrderResponse] Response from order placement
-      def place_order(session, order, dry_run: false)
+      # @raise [OrderValidationError] if validation fails
+      def place_order(session, order, dry_run: false, skip_validation: false)
+        # Validate the order unless explicitly skipped or it's a dry-run
+        unless skip_validation || dry_run
+          validator = OrderValidator.new(session, self, order)
+          validator.validate!
+        end
+
         endpoint = "/accounts/#{account_number}/orders"
         endpoint += "/dry-run" if dry_run
 

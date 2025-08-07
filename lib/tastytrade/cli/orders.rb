@@ -212,6 +212,174 @@ module Tastytrade
         end
       end
 
+      desc "place", "Place a new order"
+      option :account, type: :string, desc: "Account number (uses default if not specified)"
+      option :symbol, type: :string, required: true, desc: "Symbol to trade (e.g., AAPL, SPY)"
+      option :action, type: :string, required: true, desc: "Order action (buy_to_open, sell_to_close, etc.)"
+      option :quantity, type: :numeric, required: true, desc: "Number of shares"
+      option :type, type: :string, default: "limit", desc: "Order type (market, limit)"
+      option :price, type: :numeric, desc: "Limit price (required for limit orders)"
+      option :dry_run, type: :boolean, default: false, desc: "Perform validation only without placing the order"
+      option :skip_confirmation, type: :boolean, default: false, desc: "Skip confirmation prompt"
+      def place
+        require_authentication!
+
+        account = if options[:account]
+          Tastytrade::Models::Account.get(current_session, options[:account])
+        else
+          current_account || select_account_interactively
+        end
+
+        return unless account
+
+        # Map user-friendly action names to API constants
+        action_map = {
+          "buy_to_open" => Tastytrade::OrderAction::BUY_TO_OPEN,
+          "bto" => Tastytrade::OrderAction::BUY_TO_OPEN,
+          "sell_to_close" => Tastytrade::OrderAction::SELL_TO_CLOSE,
+          "stc" => Tastytrade::OrderAction::SELL_TO_CLOSE,
+          "sell_to_open" => Tastytrade::OrderAction::SELL_TO_OPEN,
+          "sto" => Tastytrade::OrderAction::SELL_TO_OPEN,
+          "buy_to_close" => Tastytrade::OrderAction::BUY_TO_CLOSE,
+          "btc" => Tastytrade::OrderAction::BUY_TO_CLOSE
+        }
+
+        action = action_map[options[:action].downcase]
+        unless action
+          error "Invalid action. Must be one of: #{action_map.keys.join(", ")}"
+          exit 1
+        end
+
+        # Map order type
+        order_type = case options[:type].downcase
+                     when "market", "mkt"
+                       Tastytrade::OrderType::MARKET
+                     when "limit", "lmt"
+                       Tastytrade::OrderType::LIMIT
+                     when "stop", "stp"
+                       Tastytrade::OrderType::STOP
+                     else
+                       error "Invalid order type. Must be: market, limit, or stop"
+          exit 1
+        end
+
+        # Validate price for limit orders
+        if order_type == Tastytrade::OrderType::LIMIT && options[:price].nil?
+          error "Price is required for limit orders"
+          exit 1
+        end
+
+        # Create the order
+        leg = Tastytrade::OrderLeg.new(
+          action: action,
+          symbol: options[:symbol].upcase,
+          quantity: options[:quantity].to_i
+        )
+
+        order = Tastytrade::Order.new(
+          type: order_type,
+          legs: leg,
+          price: options[:price] ? BigDecimal(options[:price].to_s) : nil
+        )
+
+        # Display order summary
+        puts ""
+        puts "Order Summary:"
+        puts "  Account: #{account.account_number}"
+        puts "  Symbol: #{options[:symbol].upcase}"
+        puts "  Action: #{action}"
+        puts "  Quantity: #{options[:quantity]}"
+        puts "  Type: #{order_type}"
+        puts "  Price: #{options[:price] ? format_currency(options[:price]) : "Market"}"
+        puts ""
+
+        # Perform dry-run validation first
+        info "Validating order..."
+        begin
+          validator = Tastytrade::OrderValidator.new(current_session, account, order)
+
+          # Always do a dry-run to get buying power effect
+          dry_run_response = validator.dry_run_validate!
+
+          if dry_run_response && dry_run_response.buying_power_effect
+            effect = dry_run_response.buying_power_effect
+            puts "Buying Power Impact:"
+            puts "  Current BP: #{format_currency(effect.current_buying_power)}"
+            puts "  Order Impact: #{format_currency(effect.buying_power_change_amount)}"
+            puts "  New BP: #{format_currency(effect.new_buying_power)}"
+            puts "  BP Usage: #{effect.buying_power_usage_percentage}%"
+            puts ""
+          end
+
+          # Display any warnings
+          if validator.warnings.any?
+            puts "Warnings:"
+            validator.warnings.each { |w| warning "  - #{w}" }
+            puts ""
+          end
+
+          # Check for validation errors
+          if validator.errors.any?
+            error "Validation failed:"
+            validator.errors.each { |e| error "  - #{e}" }
+            exit 1
+          end
+
+        rescue Tastytrade::OrderValidationError => e
+          error "Order validation failed:"
+          e.errors.each { |err| error "  - #{err}" }
+          exit 1
+        rescue StandardError => e
+          error "Validation error: #{e.message}"
+          exit 1
+        end
+
+        # If dry-run only, stop here
+        if options[:dry_run]
+          success "Dry-run validation passed! Order is valid but was not placed."
+          return
+        end
+
+        # Confirmation prompt
+        unless options[:skip_confirmation]
+          prompt = TTY::Prompt.new
+          unless prompt.yes?("Place this order?")
+            info "Order cancelled by user"
+            return
+          end
+        end
+
+        # Place the order
+        info "Placing order..."
+        begin
+          response = account.place_order(current_session, order, skip_validation: true)
+
+          success "Order placed successfully!"
+          puts ""
+          puts "Order Details:"
+          puts "  Order ID: #{response.order_id}"
+          puts "  Status: #{response.status}"
+
+          if response.buying_power_effect
+            puts "  Buying Power Effect: #{format_currency(response.buying_power_effect)}"
+          end
+
+        rescue Tastytrade::OrderValidationError => e
+          error "Order validation failed:"
+          e.errors.each { |err| error "  - #{err}" }
+          exit 1
+        rescue Tastytrade::InsufficientFundsError => e
+          error "Insufficient funds: #{e.message}"
+          exit 1
+        rescue Tastytrade::MarketClosedError => e
+          error "Market closed: #{e.message}"
+          exit 1
+        rescue Tastytrade::Error => e
+          error "Failed to place order: #{e.message}"
+          exit 1
+        end
+      end
+
       desc "replace ORDER_ID", "Replace/modify an existing order"
       option :account, type: :string, desc: "Account number (uses default if not specified)"
       option :price, type: :numeric, desc: "New price for the order"
