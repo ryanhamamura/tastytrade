@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Nothing yet
+
+### Changed
+- Nothing yet
+
+### Deprecated
+- Nothing yet
+
+### Removed
+- Nothing yet
+
+### Fixed
+- Nothing yet
+
+### Security
+- Nothing yet
+
+## [0.3.0] - 2025-08-08
+
+### Added
 - Order time-in-force CLI support (#15)
   - Added --time-in-force option to `order place` command
   - Support for DAY and GTC (Good Till Cancelled) order durations
@@ -174,12 +194,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keyring gem dependency and KeyringStore implementation
   - Replaced with more reliable file-based credential storage
   - Eliminates cross-platform keyring compatibility issues
-
-### Deprecated
-- Nothing yet
-
-### Security
-- Nothing yet
 
 ## [0.2.0] - 2025-08-01
 
