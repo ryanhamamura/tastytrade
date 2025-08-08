@@ -56,7 +56,8 @@ module MarketHoursHelper
     if market_open?
       skip "No existing cassette found. Set VCR_MODE=record to record new cassettes."
     else
-      skip "Market is closed. Tests requiring live API calls can only run during market hours (9:30 AM - 4:00 PM ET, Mon-Fri)."
+      skip "Market is closed. Tests requiring live API calls can only run during " \
+           "market hours (9:30 AM - 4:00 PM ET, Mon-Fri)."
     end
   end
 
