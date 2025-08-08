@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- VCR test framework implementation (#42)
+  - Replaced WebMock-based mocks with real API recordings via VCR
+  - Added comprehensive VCR configuration with sensitive data filtering
+  - Implemented market hours helper for Tastytrade sandbox constraints
+  - Created pre-commit hook for automated secret scanning
+  - Added dotenv support for test environment credentials
+  - Converted Session class tests to use VCR cassettes
+  - Added Ruby version compatibility checking module
+  - Documented VCR setup and recording procedures
+  - Configured GitHub Actions secrets documentation
+  - 17 recorded cassettes with proper data sanitization
 - Order time-in-force CLI support (#15)
   - Added --time-in-force option to `order place` command
   - Support for DAY and GTC (Good Till Cancelled) order durations

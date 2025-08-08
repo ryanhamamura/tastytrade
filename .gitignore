@@ -11,3 +11,8 @@
 /*.gem
 /.rubocop-https--*
 /.rubocop-cache/
+
+# Environment variables with actual credentials
+.env.test
+.env.local
+.env*.local

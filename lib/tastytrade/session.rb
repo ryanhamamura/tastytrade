@@ -68,7 +68,7 @@ module Tastytrade
     # @return [Boolean] True if session is valid
     def validate
       warn "DEBUG: Validating session, user=#{@user&.email}" if ENV["DEBUG_SESSION"]
-      response = get("/sessions/validate")
+      response = get("/customers/me")
       if ENV["DEBUG_SESSION"]
         warn "DEBUG: Validate response email=#{response["data"]["email"]}, user email=#{@user&.email}"
       end

@@ -1,0 +1,463 @@
+---
+http_interactions:
+- request:
+    method: post
+    uri: https://api.cert.tastyworks.com/sessions
+    body:
+      encoding: UTF-8
+      base64_string: |
+        eyJsb2dpbiI6IjxTQU5EQk9YX1VTRVJOQU1FPiIsInJlbWVtYmVyLW1lIjp0
+        cnVlLCJwYXNzd29yZCI6IjxQQVNTV09SRD4ifQ==
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+  response:
+    status:
+      code: 201
+      message: Created
+    headers:
+      Date:
+      - Fri, 08 Aug 2025 11:55:32 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Set-Cookie:
+      - AWSALB=ViSvSreAm/DyFi2LsfMg3WURdeFpKedYXcF3yii5EbZ6R+w/+PupxZ2jlPHDh3JHwkw+PuzG3vuoEWAFoRMbCC6K7ih+6lBfl7XrZ4tMCl4rsqeDg/NlFXVQSF+Q;
+        Expires=Fri, 15 Aug 2025 11:55:31 GMT; Path=/
+      - AWSALBCORS=ViSvSreAm/DyFi2LsfMg3WURdeFpKedYXcF3yii5EbZ6R+w/+PupxZ2jlPHDh3JHwkw+PuzG3vuoEWAFoRMbCC6K7ih+6lBfl7XrZ4tMCl4rsqeDg/NlFXVQSF+Q;
+        Expires=Fri, 15 Aug 2025 11:55:31 GMT; Path=/; SameSite=None; Secure
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Access-Control-Allow-Headers:
+      - Accept-Version,Authorization,Cache-Control,Content-Type,If-Modified-Since,Keep-Alive,User-Agent,X-Castle-Request-Token,X-Forwarded-For,X-Real-IP,X-Request-Id,X-Requested-With,X-Tastyworks-OTP
+      Access-Control-Allow-Methods:
+      - GET, POST, OPTIONS, PUT, PATCH, DELETE
+      Access-Control-Expose-Headers:
+      - X-Tastyworks-OTP
+    body:
+      encoding: UTF-8
+      base64_string: |
+        eyJkYXRhIjp7InVzZXIiOnsiZW1haWwiOiI8U0FOREJPWF9VU0VSTkFNRT4i
+        LCJleHRlcm5hbC1pZCI6IlU5NjQ2MzQ4Zi1mOGFjLTQ4M2EtODg3Yi0zMGI5
+        MDVhODRmYWUiLCJpcy1jb25maXJtZWQiOnRydWUsImlzLXR3by1mYWN0b3It
+        c2Vzc2lvbnMtZW5mb3JjZWQiOmZhbHNlLCJ1c2VybmFtZSI6ImJhY3Rlcmlh
+        NTI0NSJ9LCJyZW1lbWJlci10b2tlbiI6IjxSRU1FTUJFUl9UT0tFTj4iLCJz
+        ZXNzaW9uLWV4cGlyYXRpb24iOiIyMDI1LTA4LTA5VDExOjU1OjMxLjY0MVoi
+        LCJzZXNzaW9uLXRva2VuIjoiPFNFU1NJT05fVE9LRU4+In0sImNvbnRleHQi
+        OiIvc2Vzc2lvbnMifQ==
+  recorded_at: Fri, 08 Aug 2025 11:55:32 GMT
+- request:
+    method: post
+    uri: https://api.cert.tastyworks.com/sessions
+    body:
+      encoding: UTF-8
+      base64_string: |
+        eyJsb2dpbiI6IjxTQU5EQk9YX1VTRVJOQU1FPiIsInJlbWVtYmVyLW1lIjp0
+        cnVlLCJyZW1lbWJlci10b2tlbiI6IjMySHliRGhkbUtPWFJ1R1R1OW9NdlVM
+        bGRTZHI3cXRwSVo2bXZNak1lVjdZZ3lPaGJ4MUMtdyJ9
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+  response:
+    status:
+      code: 201
+      message: Created
+    headers:
+      Date:
+      - Fri, 08 Aug 2025 11:55:33 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Set-Cookie:
+      - AWSALB=g5MuSbcAUlEVULGlGGqzT2uQh6QOG6ABmBMBgF1BchGipdg5eFUcyyY34zwgZzcQCrzW8EK0ULQRfiIn/9Ru405TCE3DBRxQY1vgr4eD41Hu6T7BQ34WygHjmMkK;
+        Expires=Fri, 15 Aug 2025 11:55:32 GMT; Path=/
+      - AWSALBCORS=g5MuSbcAUlEVULGlGGqzT2uQh6QOG6ABmBMBgF1BchGipdg5eFUcyyY34zwgZzcQCrzW8EK0ULQRfiIn/9Ru405TCE3DBRxQY1vgr4eD41Hu6T7BQ34WygHjmMkK;
+        Expires=Fri, 15 Aug 2025 11:55:32 GMT; Path=/; SameSite=None; Secure
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Access-Control-Allow-Headers:
+      - Accept-Version,Authorization,Cache-Control,Content-Type,If-Modified-Since,Keep-Alive,User-Agent,X-Castle-Request-Token,X-Forwarded-For,X-Real-IP,X-Request-Id,X-Requested-With,X-Tastyworks-OTP
+      Access-Control-Allow-Methods:
+      - GET, POST, OPTIONS, PUT, PATCH, DELETE
+      Access-Control-Expose-Headers:
+      - X-Tastyworks-OTP
+    body:
+      encoding: UTF-8
+      base64_string: |
+        eyJkYXRhIjp7InVzZXIiOnsiZW1haWwiOiI8U0FOREJPWF9VU0VSTkFNRT4i
+        LCJleHRlcm5hbC1pZCI6IlU5NjQ2MzQ4Zi1mOGFjLTQ4M2EtODg3Yi0zMGI5
+        MDVhODRmYWUiLCJpcy1jb25maXJtZWQiOnRydWUsImlzLXR3by1mYWN0b3It
+        c2Vzc2lvbnMtZW5mb3JjZWQiOmZhbHNlLCJ1c2VybmFtZSI6ImJhY3Rlcmlh
+        NTI0NSJ9LCJyZW1lbWJlci10b2tlbiI6IjxSRU1FTUJFUl9UT0tFTj4iLCJz
+        ZXNzaW9uLWV4cGlyYXRpb24iOiIyMDI1LTA4LTA5VDExOjU1OjMzLjMwMloi
+        LCJzZXNzaW9uLXRva2VuIjoiPFNFU1NJT05fVE9LRU4+In0sImNvbnRleHQi
+        OiIvc2Vzc2lvbnMifQ==
+  recorded_at: Fri, 08 Aug 2025 11:55:33 GMT
+- request:
+    method: post
+    uri: https://api.cert.tastyworks.com/sessions
+    body:
+      encoding: UTF-8
+      base64_string: |
+        eyJsb2dpbiI6IjxTQU5EQk9YX1VTRVJOQU1FPiIsInJlbWVtYmVyLW1lIjp0
+        cnVlLCJwYXNzd29yZCI6IjxQQVNTV09SRD4ifQ==
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+  response:
+    status:
+      code: 201
+      message: Created
+    headers:
+      Date:
+      - Fri, 08 Aug 2025 12:01:10 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Set-Cookie:
+      - AWSALB=j5Vd+fIy5GEJAUiTbxVU0amgmY34SphiTRbvcqUHykTOCgqlrfdsFDSZG1YDDGHFcRm6Kx3trrQ13/mXB96fG61ZBDL6OsbLc+zDTzrBooFqa7ZzzOQ+tRgHXMlR;
+        Expires=Fri, 15 Aug 2025 12:01:09 GMT; Path=/
+      - AWSALBCORS=j5Vd+fIy5GEJAUiTbxVU0amgmY34SphiTRbvcqUHykTOCgqlrfdsFDSZG1YDDGHFcRm6Kx3trrQ13/mXB96fG61ZBDL6OsbLc+zDTzrBooFqa7ZzzOQ+tRgHXMlR;
+        Expires=Fri, 15 Aug 2025 12:01:09 GMT; Path=/; SameSite=None; Secure
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Access-Control-Allow-Headers:
+      - Accept-Version,Authorization,Cache-Control,Content-Type,If-Modified-Since,Keep-Alive,User-Agent,X-Castle-Request-Token,X-Forwarded-For,X-Real-IP,X-Request-Id,X-Requested-With,X-Tastyworks-OTP
+      Access-Control-Allow-Methods:
+      - GET, POST, OPTIONS, PUT, PATCH, DELETE
+      Access-Control-Expose-Headers:
+      - X-Tastyworks-OTP
+    body:
+      encoding: UTF-8
+      base64_string: |
+        eyJkYXRhIjp7InVzZXIiOnsiZW1haWwiOiI8U0FOREJPWF9VU0VSTkFNRT4i
+        LCJleHRlcm5hbC1pZCI6IlU5NjQ2MzQ4Zi1mOGFjLTQ4M2EtODg3Yi0zMGI5
+        MDVhODRmYWUiLCJpcy1jb25maXJtZWQiOnRydWUsImlzLXR3by1mYWN0b3It
+        c2Vzc2lvbnMtZW5mb3JjZWQiOmZhbHNlLCJ1c2VybmFtZSI6ImJhY3Rlcmlh
+        NTI0NSJ9LCJyZW1lbWJlci10b2tlbiI6IjxSRU1FTUJFUl9UT0tFTj4iLCJz
+        ZXNzaW9uLWV4cGlyYXRpb24iOiIyMDI1LTA4LTA5VDEyOjAxOjA5LjQ4Mloi
+        LCJzZXNzaW9uLXRva2VuIjoiPFNFU1NJT05fVE9LRU4+In0sImNvbnRleHQi
+        OiIvc2Vzc2lvbnMifQ==
+  recorded_at: Fri, 08 Aug 2025 12:01:10 GMT
+- request:
+    method: post
+    uri: https://api.cert.tastyworks.com/sessions
+    body:
+      encoding: UTF-8
+      base64_string: |
+        eyJsb2dpbiI6IjxTQU5EQk9YX1VTRVJOQU1FPiIsInJlbWVtYmVyLW1lIjp0
+        cnVlLCJyZW1lbWJlci10b2tlbiI6ImFqc2t2VUlpZVFWUkMxSXVXRkkzZDYz
+        WWpEWWZMUHVSSVMweU9sMm5RWE1YdVN0MUJMVWp1ZyJ9
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+  response:
+    status:
+      code: 201
+      message: Created
+    headers:
+      Date:
+      - Fri, 08 Aug 2025 12:01:11 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Set-Cookie:
+      - AWSALB=fG5uXsn+MV0nfcM4cwB4RCpQyEjPR1OVoDQArljCVpj7fABDNIhnv05fujchw1hON4xiMxJyhpo5HF50+8A7C5qz6ZAPYz5rLy2xshjXjvAc/UWGHWw/daV6gJEq;
+        Expires=Fri, 15 Aug 2025 12:01:11 GMT; Path=/
+      - AWSALBCORS=fG5uXsn+MV0nfcM4cwB4RCpQyEjPR1OVoDQArljCVpj7fABDNIhnv05fujchw1hON4xiMxJyhpo5HF50+8A7C5qz6ZAPYz5rLy2xshjXjvAc/UWGHWw/daV6gJEq;
+        Expires=Fri, 15 Aug 2025 12:01:11 GMT; Path=/; SameSite=None; Secure
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Access-Control-Allow-Headers:
+      - Accept-Version,Authorization,Cache-Control,Content-Type,If-Modified-Since,Keep-Alive,User-Agent,X-Castle-Request-Token,X-Forwarded-For,X-Real-IP,X-Request-Id,X-Requested-With,X-Tastyworks-OTP
+      Access-Control-Allow-Methods:
+      - GET, POST, OPTIONS, PUT, PATCH, DELETE
+      Access-Control-Expose-Headers:
+      - X-Tastyworks-OTP
+    body:
+      encoding: UTF-8
+      base64_string: |
+        eyJkYXRhIjp7InVzZXIiOnsiZW1haWwiOiI8U0FOREJPWF9VU0VSTkFNRT4i
+        LCJleHRlcm5hbC1pZCI6IlU5NjQ2MzQ4Zi1mOGFjLTQ4M2EtODg3Yi0zMGI5
+        MDVhODRmYWUiLCJpcy1jb25maXJtZWQiOnRydWUsImlzLXR3by1mYWN0b3It
+        c2Vzc2lvbnMtZW5mb3JjZWQiOmZhbHNlLCJ1c2VybmFtZSI6ImJhY3Rlcmlh
+        NTI0NSJ9LCJyZW1lbWJlci10b2tlbiI6IjxSRU1FTUJFUl9UT0tFTj4iLCJz
+        ZXNzaW9uLWV4cGlyYXRpb24iOiIyMDI1LTA4LTA5VDEyOjAxOjExLjM1Mloi
+        LCJzZXNzaW9uLXRva2VuIjoiPFNFU1NJT05fVE9LRU4+In0sImNvbnRleHQi
+        OiIvc2Vzc2lvbnMifQ==
+  recorded_at: Fri, 08 Aug 2025 12:01:11 GMT
+- request:
+    method: post
+    uri: https://api.cert.tastyworks.com/sessions
+    body:
+      encoding: UTF-8
+      base64_string: |
+        eyJsb2dpbiI6IjxTQU5EQk9YX1VTRVJOQU1FPiIsInJlbWVtYmVyLW1lIjp0
+        cnVlLCJwYXNzd29yZCI6IjxQQVNTV09SRD4ifQ==
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+  response:
+    status:
+      code: 201
+      message: Created
+    headers:
+      Date:
+      - Fri, 08 Aug 2025 12:01:45 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Set-Cookie:
+      - AWSALB=VjOSBXvdUtVbB6uu4+XJKLJG/8UoDousAgVdx1xUrDEKMmeSOiINZne6G3ZhjLH5VPywoi99mlDKEPaCNKoD38Xrz2hH3txAIIOyqYnSLasWB6jACLY2auwAo78a;
+        Expires=Fri, 15 Aug 2025 12:01:44 GMT; Path=/
+      - AWSALBCORS=VjOSBXvdUtVbB6uu4+XJKLJG/8UoDousAgVdx1xUrDEKMmeSOiINZne6G3ZhjLH5VPywoi99mlDKEPaCNKoD38Xrz2hH3txAIIOyqYnSLasWB6jACLY2auwAo78a;
+        Expires=Fri, 15 Aug 2025 12:01:44 GMT; Path=/; SameSite=None; Secure
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Access-Control-Allow-Headers:
+      - Accept-Version,Authorization,Cache-Control,Content-Type,If-Modified-Since,Keep-Alive,User-Agent,X-Castle-Request-Token,X-Forwarded-For,X-Real-IP,X-Request-Id,X-Requested-With,X-Tastyworks-OTP
+      Access-Control-Allow-Methods:
+      - GET, POST, OPTIONS, PUT, PATCH, DELETE
+      Access-Control-Expose-Headers:
+      - X-Tastyworks-OTP
+    body:
+      encoding: UTF-8
+      base64_string: |
+        eyJkYXRhIjp7InVzZXIiOnsiZW1haWwiOiI8U0FOREJPWF9VU0VSTkFNRT4i
+        LCJleHRlcm5hbC1pZCI6IlU5NjQ2MzQ4Zi1mOGFjLTQ4M2EtODg3Yi0zMGI5
+        MDVhODRmYWUiLCJpcy1jb25maXJtZWQiOnRydWUsImlzLXR3by1mYWN0b3It
+        c2Vzc2lvbnMtZW5mb3JjZWQiOmZhbHNlLCJ1c2VybmFtZSI6ImJhY3Rlcmlh
+        NTI0NSJ9LCJyZW1lbWJlci10b2tlbiI6IjxSRU1FTUJFUl9UT0tFTj4iLCJz
+        ZXNzaW9uLWV4cGlyYXRpb24iOiIyMDI1LTA4LTA5VDEyOjAxOjQ0LjYwNVoi
+        LCJzZXNzaW9uLXRva2VuIjoiPFNFU1NJT05fVE9LRU4+In0sImNvbnRleHQi
+        OiIvc2Vzc2lvbnMifQ==
+  recorded_at: Fri, 08 Aug 2025 12:01:45 GMT
+- request:
+    method: post
+    uri: https://api.cert.tastyworks.com/sessions
+    body:
+      encoding: UTF-8
+      base64_string: |
+        eyJsb2dpbiI6IjxTQU5EQk9YX1VTRVJOQU1FPiIsInJlbWVtYmVyLW1lIjp0
+        cnVlLCJyZW1lbWJlci10b2tlbiI6Im5UcWRRdjRna1hXb1RHYUlBXzMyWE9w
+        eURBZGYyVnNBcVRuRTQ0VE03Q0FIcjZXUmdMZzVMdyJ9
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+  response:
+    status:
+      code: 201
+      message: Created
+    headers:
+      Date:
+      - Fri, 08 Aug 2025 12:01:47 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Set-Cookie:
+      - AWSALB=rF4E0CkdruSN3hm+SNL5MCwvJr0Zb5+eXHqmAPgA2WcvcccGhaOcgzTyNdd6nKei1VK0oKXrQoRdN4UeLf8Rax4eDNU+1yUL6111Nd6ZrTCtzOkhHw1CvDkvJUrc;
+        Expires=Fri, 15 Aug 2025 12:01:45 GMT; Path=/
+      - AWSALBCORS=rF4E0CkdruSN3hm+SNL5MCwvJr0Zb5+eXHqmAPgA2WcvcccGhaOcgzTyNdd6nKei1VK0oKXrQoRdN4UeLf8Rax4eDNU+1yUL6111Nd6ZrTCtzOkhHw1CvDkvJUrc;
+        Expires=Fri, 15 Aug 2025 12:01:45 GMT; Path=/; SameSite=None; Secure
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Access-Control-Allow-Headers:
+      - Accept-Version,Authorization,Cache-Control,Content-Type,If-Modified-Since,Keep-Alive,User-Agent,X-Castle-Request-Token,X-Forwarded-For,X-Real-IP,X-Request-Id,X-Requested-With,X-Tastyworks-OTP
+      Access-Control-Allow-Methods:
+      - GET, POST, OPTIONS, PUT, PATCH, DELETE
+      Access-Control-Expose-Headers:
+      - X-Tastyworks-OTP
+    body:
+      encoding: UTF-8
+      base64_string: |
+        eyJkYXRhIjp7InVzZXIiOnsiZW1haWwiOiI8U0FOREJPWF9VU0VSTkFNRT4i
+        LCJleHRlcm5hbC1pZCI6IlU5NjQ2MzQ4Zi1mOGFjLTQ4M2EtODg3Yi0zMGI5
+        MDVhODRmYWUiLCJpcy1jb25maXJtZWQiOnRydWUsImlzLXR3by1mYWN0b3It
+        c2Vzc2lvbnMtZW5mb3JjZWQiOmZhbHNlLCJ1c2VybmFtZSI6ImJhY3Rlcmlh
+        NTI0NSJ9LCJyZW1lbWJlci10b2tlbiI6IjxSRU1FTUJFUl9UT0tFTj4iLCJz
+        ZXNzaW9uLWV4cGlyYXRpb24iOiIyMDI1LTA4LTA5VDEyOjAxOjQ1LjkyMFoi
+        LCJzZXNzaW9uLXRva2VuIjoiPFNFU1NJT05fVE9LRU4+In0sImNvbnRleHQi
+        OiIvc2Vzc2lvbnMifQ==
+  recorded_at: Fri, 08 Aug 2025 12:01:47 GMT
+- request:
+    method: post
+    uri: https://api.cert.tastyworks.com/sessions
+    body:
+      encoding: UTF-8
+      base64_string: |
+        eyJsb2dpbiI6IjxTQU5EQk9YX1VTRVJOQU1FPiIsInJlbWVtYmVyLW1lIjp0
+        cnVlLCJwYXNzd29yZCI6IjxQQVNTV09SRD4ifQ==
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+  response:
+    status:
+      code: 201
+      message: Created
+    headers:
+      Date:
+      - Fri, 08 Aug 2025 18:35:11 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Set-Cookie:
+      - AWSALB=H/KNq13EAUZURciNiXKVL+/Ta6UfbdjgD2GvPSfE1/zMnLBf1J92h3XZx/HejpFeJ2Q/M1hB3Ws3+sgMlghbGQkOGSIb4SojMMN/SWLUg5XzjH3EP2ugUdOlByzt;
+        Expires=Fri, 15 Aug 2025 18:35:11 GMT; Path=/
+      - AWSALBCORS=H/KNq13EAUZURciNiXKVL+/Ta6UfbdjgD2GvPSfE1/zMnLBf1J92h3XZx/HejpFeJ2Q/M1hB3Ws3+sgMlghbGQkOGSIb4SojMMN/SWLUg5XzjH3EP2ugUdOlByzt;
+        Expires=Fri, 15 Aug 2025 18:35:11 GMT; Path=/; SameSite=None; Secure
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Access-Control-Allow-Headers:
+      - Accept-Version,Authorization,Cache-Control,Content-Type,If-Modified-Since,Keep-Alive,User-Agent,X-Castle-Request-Token,X-Forwarded-For,X-Real-IP,X-Request-Id,X-Requested-With,X-Tastyworks-OTP
+      Access-Control-Allow-Methods:
+      - GET, POST, OPTIONS, PUT, PATCH, DELETE
+      Access-Control-Expose-Headers:
+      - X-Tastyworks-OTP
+    body:
+      encoding: UTF-8
+      base64_string: |
+        eyJkYXRhIjp7InVzZXIiOnsiZW1haWwiOiI8U0FOREJPWF9VU0VSTkFNRT4i
+        LCJleHRlcm5hbC1pZCI6IlU5NjQ2MzQ4Zi1mOGFjLTQ4M2EtODg3Yi0zMGI5
+        MDVhODRmYWUiLCJpcy1jb25maXJtZWQiOnRydWUsImlzLXR3by1mYWN0b3It
+        c2Vzc2lvbnMtZW5mb3JjZWQiOmZhbHNlLCJ1c2VybmFtZSI6ImJhY3Rlcmlh
+        NTI0NSJ9LCJyZW1lbWJlci10b2tlbiI6IjxSRU1FTUJFUl9UT0tFTj4iLCJz
+        ZXNzaW9uLWV4cGlyYXRpb24iOiIyMDI1LTA4LTA5VDE4OjM1OjExLjcyMFoi
+        LCJzZXNzaW9uLXRva2VuIjoiPFNFU1NJT05fVE9LRU4+In0sImNvbnRleHQi
+        OiIvc2Vzc2lvbnMifQ==
+  recorded_at: Fri, 08 Aug 2025 18:35:12 GMT
+- request:
+    method: post
+    uri: https://api.cert.tastyworks.com/sessions
+    body:
+      encoding: UTF-8
+      base64_string: |
+        eyJsb2dpbiI6IjxTQU5EQk9YX1VTRVJOQU1FPiIsInJlbWVtYmVyLW1lIjp0
+        cnVlLCJyZW1lbWJlci10b2tlbiI6Imswd3JZSzhGS19WUVN6QjJ6YW1WZmFv
+        NnhUUXlJMW5CNFluNWttRkdpRmxKSW9NT2hHcHZuUSJ9
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+  response:
+    status:
+      code: 201
+      message: Created
+    headers:
+      Date:
+      - Fri, 08 Aug 2025 18:35:13 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Set-Cookie:
+      - AWSALB=7Ohtl70PPFSBdX0MkTlyYLzs6luCz8SMQKw+AGZKHO5w0M5lC/MViKN1XB/e/F4SqyBjfUK9E+VGedn0A6GWu5/qlG1stUkCEG+GVk4+1U4p3pXYQQibxyN4rZla;
+        Expires=Fri, 15 Aug 2025 18:35:12 GMT; Path=/
+      - AWSALBCORS=7Ohtl70PPFSBdX0MkTlyYLzs6luCz8SMQKw+AGZKHO5w0M5lC/MViKN1XB/e/F4SqyBjfUK9E+VGedn0A6GWu5/qlG1stUkCEG+GVk4+1U4p3pXYQQibxyN4rZla;
+        Expires=Fri, 15 Aug 2025 18:35:12 GMT; Path=/; SameSite=None; Secure
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Access-Control-Allow-Headers:
+      - Accept-Version,Authorization,Cache-Control,Content-Type,If-Modified-Since,Keep-Alive,User-Agent,X-Castle-Request-Token,X-Forwarded-For,X-Real-IP,X-Request-Id,X-Requested-With,X-Tastyworks-OTP
+      Access-Control-Allow-Methods:
+      - GET, POST, OPTIONS, PUT, PATCH, DELETE
+      Access-Control-Expose-Headers:
+      - X-Tastyworks-OTP
+    body:
+      encoding: UTF-8
+      base64_string: |
+        eyJkYXRhIjp7InVzZXIiOnsiZW1haWwiOiI8U0FOREJPWF9VU0VSTkFNRT4i
+        LCJleHRlcm5hbC1pZCI6IlU5NjQ2MzQ4Zi1mOGFjLTQ4M2EtODg3Yi0zMGI5
+        MDVhODRmYWUiLCJpcy1jb25maXJtZWQiOnRydWUsImlzLXR3by1mYWN0b3It
+        c2Vzc2lvbnMtZW5mb3JjZWQiOmZhbHNlLCJ1c2VybmFtZSI6ImJhY3Rlcmlh
+        NTI0NSJ9LCJyZW1lbWJlci10b2tlbiI6IjxSRU1FTUJFUl9UT0tFTj4iLCJz
+        ZXNzaW9uLWV4cGlyYXRpb24iOiIyMDI1LTA4LTA5VDE4OjM1OjEzLjA1OVoi
+        LCJzZXNzaW9uLXRva2VuIjoiPFNFU1NJT05fVE9LRU4+In0sImNvbnRleHQi
+        OiIvc2Vzc2lvbnMifQ==
+  recorded_at: Fri, 08 Aug 2025 18:35:13 GMT
+recorded_with: VCR 6.3.1

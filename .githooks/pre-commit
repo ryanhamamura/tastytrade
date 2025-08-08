@@ -1,0 +1,74 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Pre-commit hook to scan for potential secrets in VCR cassettes
+# Install by running: git config core.hooksPath .githooks
+
+require 'yaml'
+require 'pathname'
+
+class SecretScanner
+  PATTERNS = {
+    'Session Token' => /session-token:\s*["']?[A-Za-z0-9+\/=]{20,}/i,
+    'Remember Token' => /remember-token:\s*["']?[A-Za-z0-9+\/=]{20,}/i,
+    'API Key' => /api[_-]?key:\s*["']?[A-Za-z0-9]{20,}/i,
+    'Password' => /password:\s*["']?(?!<SANDBOX_PASSWORD>)[^"'\s]{8,}/i,
+    'Account Number' => /account.*:\s*["']?(?!<SANDBOX_ACCOUNT>)[A-Z0-9]{8,}/i,
+    'Email' => /email:\s*["']?(?!<SANDBOX_USERNAME>)[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/i,
+    'Bearer Token' => /Bearer\s+(?!<[A-Z_]+>)[A-Za-z0-9+\/=]{20,}/,
+    'Base64 Credentials' => /Basic\s+(?!<[A-Z_]+>)[A-Za-z0-9+\/=]{20,}/
+  }.freeze
+
+  ALLOWED_PLACEHOLDERS = %w[
+    <SANDBOX_USERNAME>
+    <SANDBOX_PASSWORD>
+    <SANDBOX_ACCOUNT>
+    <SESSION_TOKEN>
+    <REMEMBER_TOKEN>
+    <FILTERED>
+  ].freeze
+
+  def self.scan
+    cassette_dir = Pathname.new('spec/fixtures/vcr_cassettes')
+    return true unless cassette_dir.exist?
+
+    violations = []
+    
+    Dir.glob(cassette_dir.join('**/*.yml')).each do |file|
+      content = File.read(file)
+      
+      PATTERNS.each do |name, pattern|
+        if content.match?(pattern)
+          # Check if it's a filtered placeholder
+          match = content.match(pattern)
+          next if match && ALLOWED_PLACEHOLDERS.any? { |p| match[0].include?(p) }
+          
+          violations << "#{file}: Potential #{name} detected"
+        end
+      end
+    end
+
+    if violations.any?
+      puts "\n⚠️  SECURITY WARNING: Potential secrets detected in VCR cassettes:"
+      violations.each { |v| puts "  • #{v}" }
+      puts "\nPlease ensure all sensitive data is properly filtered in spec/spec_helper.rb"
+      puts "Add filters like: config.filter_sensitive_data('<PLACEHOLDER>') { actual_value }"
+      return false
+    end
+
+    true
+  end
+end
+
+# Only run if VCR cassettes are being committed
+staged_files = `git diff --cached --name-only`.split("\n")
+vcr_files = staged_files.select { |f| f.include?('vcr_cassettes') }
+
+if vcr_files.any?
+  unless SecretScanner.scan
+    puts "\nCommit aborted. Fix the security issues and try again."
+    exit 1
+  end
+end
+
+exit 0

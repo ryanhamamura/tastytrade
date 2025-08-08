@@ -1,0 +1,107 @@
+---
+http_interactions:
+- request:
+    method: get
+    uri: https://api.cert.tastyworks.com/sessions/validate
+    body:
+      encoding: US-ASCII
+      base64_string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+      Authorization:
+      - "<AUTH_TOKEN>"
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+  response:
+    status:
+      code: 405
+      message: Method Not Allowed
+    headers:
+      Date:
+      - Fri, 08 Aug 2025 12:01:37 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Set-Cookie:
+      - AWSALB=a2Pu/aeCgOq24XpA2uKPrlbpT22pGVDnCjC+4bo/uxVjqyfFoV5V5ydP/M80WNfzif3annbWJ5WCixg8vYkVhUwbGxPCrZhG1oPNLWDiRn7CSMKZ4fw/EkQnt81g;
+        Expires=Fri, 15 Aug 2025 12:01:36 GMT; Path=/
+      - AWSALBCORS=a2Pu/aeCgOq24XpA2uKPrlbpT22pGVDnCjC+4bo/uxVjqyfFoV5V5ydP/M80WNfzif3annbWJ5WCixg8vYkVhUwbGxPCrZhG1oPNLWDiRn7CSMKZ4fw/EkQnt81g;
+        Expires=Fri, 15 Aug 2025 12:01:36 GMT; Path=/; SameSite=None; Secure
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Access-Control-Allow-Headers:
+      - Accept-Version,Authorization,Cache-Control,Content-Type,If-Modified-Since,Keep-Alive,User-Agent,X-Castle-Request-Token,X-Forwarded-For,X-Real-IP,X-Request-Id,X-Requested-With,X-Tastyworks-OTP
+      Access-Control-Allow-Methods:
+      - GET, POST, OPTIONS, PUT, PATCH, DELETE
+      Access-Control-Expose-Headers:
+      - X-Tastyworks-OTP
+    body:
+      encoding: UTF-8
+      base64_string: |
+        eyJlcnJvciI6eyJjb2RlIjoibWV0aG9kX25vdF9hbGxvd2VkIiwibWVzc2Fn
+        ZSI6IjQwNSBOb3QgQWxsb3dlZC4gVW5pcXVlIGN1c3RvbWVyIHN1cHBvcnQg
+        aWRlbnRpZmllcjogOGEzOThiMzY0N2FkZTA0OTVhMDZhN2VlNDgzNzIxYWMi
+        fX0=
+  recorded_at: Fri, 08 Aug 2025 12:01:37 GMT
+- request:
+    method: get
+    uri: https://api.cert.tastyworks.com/customers/me
+    body:
+      encoding: US-ASCII
+      base64_string: ''
+    headers:
+      User-Agent:
+      - Faraday v2.13.4
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+      Authorization:
+      - "<AUTH_TOKEN>"
+      Accept-Encoding:
+      - gzip;q=1.0,deflate;q=0.6,identity;q=0.3
+  response:
+    status:
+      code: 401
+      message: Unauthorized
+    headers:
+      Date:
+      - Fri, 08 Aug 2025 18:35:04 GMT
+      Content-Type:
+      - application/json
+      Transfer-Encoding:
+      - chunked
+      Connection:
+      - keep-alive
+      Set-Cookie:
+      - AWSALB=dJOQBEJEZOkdUzAqG4SO0VLR2blVEfRnFw7gDZwooukbH67DUrDACAyjvN24vOp0UGdqVzG7Hgna6iSRmXMXDvPkhIEi9G11wtuA1qOCGvOG0mdAjq0WJJLbx4jB;
+        Expires=Fri, 15 Aug 2025 18:35:04 GMT; Path=/
+      - AWSALBCORS=dJOQBEJEZOkdUzAqG4SO0VLR2blVEfRnFw7gDZwooukbH67DUrDACAyjvN24vOp0UGdqVzG7Hgna6iSRmXMXDvPkhIEi9G11wtuA1qOCGvOG0mdAjq0WJJLbx4jB;
+        Expires=Fri, 15 Aug 2025 18:35:04 GMT; Path=/; SameSite=None; Secure
+      Access-Control-Allow-Origin:
+      - "*"
+      Access-Control-Allow-Credentials:
+      - 'true'
+      Access-Control-Allow-Headers:
+      - Accept-Version,Authorization,Cache-Control,Content-Type,If-Modified-Since,Keep-Alive,User-Agent,X-Castle-Request-Token,X-Forwarded-For,X-Real-IP,X-Request-Id,X-Requested-With,X-Tastyworks-OTP
+      Access-Control-Allow-Methods:
+      - GET, POST, OPTIONS, PUT, PATCH, DELETE
+      Access-Control-Expose-Headers:
+      - X-Tastyworks-OTP
+    body:
+      encoding: UTF-8
+      base64_string: |
+        eyJlcnJvciI6eyJjb2RlIjoidG9rZW5faW52YWxpZCIsIm1lc3NhZ2UiOiJU
+        aGlzIHRva2VuIGlzIGludmFsaWQgb3IgaGFzIGV4cGlyZWQifX0=
+  recorded_at: Fri, 08 Aug 2025 18:35:04 GMT
+recorded_with: VCR 6.3.1

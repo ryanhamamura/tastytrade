@@ -12,25 +12,59 @@ require "bundler/setup"
 require "tastytrade"
 require "webmock/rspec"
 require "vcr"
+require "dotenv"
+
+# Load test environment variables
+Dotenv.load(".env.test") if File.exist?(".env.test")
 
 VCR.configure do |config|
-  config.cassette_library_dir = "spec/fixtures/vcr_cassettes"
+  config.cassette_library_dir = ENV.fetch("VCR_CASSETTE_DIR", "spec/fixtures/vcr_cassettes")
   config.hook_into :webmock
   config.configure_rspec_metadata!
 
-  # Filter out sensitive data
+  # Determine recording mode based on environment
+  vcr_mode = if ENV["VCR_MODE"] =~ /rec/i
+    :all # Re-record all requests
+  elsif ENV["CI"]
+    :none # Never record in CI, only use existing cassettes
+  else
+    :once # Record once, then use cassette
+  end
+
+  # Enhanced sensitive data filtering
+  # Filter sandbox credentials from environment variables
+  config.filter_sensitive_data("<SANDBOX_USERNAME>") { ENV["TASTYTRADE_SANDBOX_USERNAME"] }
+  config.filter_sensitive_data("<SANDBOX_PASSWORD>") { ENV["TASTYTRADE_SANDBOX_PASSWORD"] }
+  config.filter_sensitive_data("<SANDBOX_ACCOUNT>") { ENV["TASTYTRADE_SANDBOX_ACCOUNT"] }
+
+  # Filter out sensitive data from requests/responses
   config.filter_sensitive_data("<AUTH_TOKEN>") do |interaction|
-    if interaction.request.headers["Authorization"]
-      interaction.request.headers["Authorization"].first
-    end
+    auth_header = interaction.request.headers["Authorization"]
+    auth_header&.first if auth_header
   end
 
   config.filter_sensitive_data("<SESSION_TOKEN>") do |interaction|
-    if interaction.response.headers["Content-Type"] &&
-       interaction.response.headers["Content-Type"].first.include?("application/json")
+    content_type = interaction.response.headers["Content-Type"]
+    if content_type&.first&.include?("application/json")
       begin
         body = JSON.parse(interaction.response.body)
-        body.dig("data", "session-token") || body.dig("data", "session_token")
+        body.dig("data", "session-token") ||
+        body.dig("data", "session_token") ||
+        body.dig("data", "attributes", "session-token")
+      rescue JSON::ParserError
+        nil
+      end
+    end
+  end
+
+  # Filter remember tokens
+  config.filter_sensitive_data("<REMEMBER_TOKEN>") do |interaction|
+    content_type = interaction.response.headers["Content-Type"]
+    if content_type&.first&.include?("application/json")
+      begin
+        body = JSON.parse(interaction.response.body)
+        body.dig("data", "remember-token") ||
+        body.dig("data", "remember_token")
       rescue JSON::ParserError
         nil
       end
@@ -65,7 +99,7 @@ VCR.configure do |config|
   end
 
   # Filter personal information from response bodies
-  config.filter_sensitive_data("<EMAIL>") do |interaction|
+  config.filter_sensitive_data("<SANDBOX_USERNAME>") do |interaction|
     if interaction.response.body
       begin
         body = JSON.parse(interaction.response.body)
@@ -76,15 +110,43 @@ VCR.configure do |config|
     end
   end
 
+  # Custom request matching for dynamic content
+  config.register_request_matcher :uri_without_timestamp do |request_1, request_2|
+    uri_1 = URI(request_1.uri)
+    uri_2 = URI(request_2.uri)
+
+    # Remove timestamp parameters for matching
+    params_1 = CGI.parse(uri_1.query || "")
+    params_2 = CGI.parse(uri_2.query || "")
+
+    params_1.delete("timestamp")
+    params_2.delete("timestamp")
+    params_1.delete("_")
+    params_2.delete("_")
+
+    uri_1.query = URI.encode_www_form(params_1)
+    uri_2.query = URI.encode_www_form(params_2)
+
+    uri_1.to_s == uri_2.to_s
+  end
+
   # Default cassette options
   config.default_cassette_options = {
-    record: :new_episodes,
-    match_requests_on: [:method, :uri, :body],
-    allow_playback_repeats: true
+    record: vcr_mode,
+    match_requests_on: [:method, :uri_without_timestamp, :body],
+    allow_playback_repeats: true,
+    serialize_with: :yaml,
+    preserve_exact_body_bytes: true,
+    decode_compressed_response: true
   }
 end
 
+# Load support files
+Dir[File.join(__dir__, "support", "**", "*.rb")].sort.each { |f| require f }
+
 RSpec.configure do |config|
+  # Include helper modules
+  config.include MarketHoursHelper if defined?(MarketHoursHelper)
   # Enable flags like --only-failures and --next-failure
   config.example_status_persistence_file_path = ".rspec_status"
 
