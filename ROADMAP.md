@@ -24,16 +24,16 @@ This document outlines the development roadmap for the unofficial Tastytrade Rub
 #### Account Operations
 - [x] Fetch account info and balances (closes #6)
 - [x] Get positions
-- [ ] Get transaction history
-- [ ] Calculate buying power
-- [ ] Account status and trading permissions
+- [x] Get transaction history (closes #8)
+- [x] Calculate buying power (closes #9)
+- [x] Account status and trading permissions (closes #10)
 
 #### Basic Trading
-- [ ] Place equity orders (market, limit)
-- [ ] Cancel/replace orders
-- [ ] Get order status
-- [ ] Order validation
-- [ ] Basic order types (day, GTC)
+- [x] Place equity orders (market, limit) (closes #11)
+- [x] Cancel/replace orders (closes #12)
+- [x] Get order status (closes #13)
+- [x] Order validation (closes #14)
+- [x] Basic order types (day, GTC) (closes #15)
 
 #### Core Infrastructure
 - [x] HTTP client setup (Faraday) (closes #16)
@@ -77,11 +77,11 @@ This document outlines the development roadmap for the unofficial Tastytrade Rub
 **Target: Q1 2026 (January - March)**
 
 #### Core CLI Commands
-- [ ] Authentication (`tt login`)
-- [ ] Account info (`tt account`)
-- [ ] Portfolio view (`tt portfolio`)
-- [ ] Basic trading (`tt trade`)
-- [ ] Order management (`tt orders`)
+- [x] Authentication (`tt login`)
+- [x] Account info (`tt account`)
+- [x] Portfolio view (`tt portfolio`)
+- [x] Basic trading (`tt trade`)
+- [x] Order management (`tt orders`)
 
 #### Options CLI
 - [ ] Option chains (`tt option chain`)
@@ -94,13 +94,13 @@ This document outlines the development roadmap for the unofficial Tastytrade Rub
 - [ ] Portfolio analysis (`tt analyze`)
 - [ ] Real-time quotes (`tt quote`)
 - [ ] Configuration management (`tt config`)
-- [ ] Interactive mode
+- [x] Interactive mode
 
 #### CLI Enhancements
-- [ ] Rich terminal output (TTY gems)
+- [x] Rich terminal output (TTY gems)
 - [ ] Progress indicators
-- [ ] Confirmation prompts
-- [ ] Output formatting (JSON, CSV, table)
+- [x] Confirmation prompts
+- [x] Output formatting (JSON, CSV, table)
 - [ ] Shell completion
 
 ### Phase 4: Advanced Features & Polish
