@@ -4,26 +4,25 @@ require "spec_helper"
 require "bigdecimal"
 
 RSpec.describe Tastytrade::Models::Account do
-  let(:account_data) do
-    {
-      "account-number" => "5WT0001",
-      "nickname" => "My Account",
-      "account-type-name" => "Individual",
-      "opened-at" => "2025-01-01T10:00:00Z",
-      "is-closed" => false,
-      "day-trader-status" => false,
-      "is-futures-approved" => true,
-      "margin-or-cash" => "Margin",
-      "is-foreign" => false,
-      "created-at" => "2025-01-01T10:00:00Z",
-      "is-test-drive" => false
-    }
-  end
+  # Tests for pure Ruby object behavior (no API calls)
+  describe "attributes (pure Ruby)" do
+    let(:account_data) do
+      {
+        "account-number" => "5WT0001",
+        "nickname" => "My Account",
+        "account-type-name" => "Individual",
+        "opened-at" => "2025-01-01T10:00:00Z",
+        "is-closed" => false,
+        "day-trader-status" => false,
+        "is-futures-approved" => true,
+        "margin-or-cash" => "Margin",
+        "is-foreign" => false,
+        "created-at" => "2025-01-01T10:00:00Z",
+        "is-test-drive" => false
+      }
+    end
 
-  let(:session) { instance_double(Tastytrade::Session) }
-  subject(:account) { described_class.new(account_data) }
-
-  describe "attributes" do
+    subject(:account) { described_class.new(account_data) }
     it "parses account number" do
       expect(account.account_number).to eq("5WT0001")
     end
@@ -53,41 +52,159 @@ RSpec.describe Tastytrade::Models::Account do
     end
   end
 
-  describe ".get_all" do
-    let(:response) do
-      {
-        "data" => {
-          "items" => [
-            {
-              "account" => account_data,
-              "authority-level" => "owner"
-            },
-            {
-              "account" => account_data.merge("account-number" => "789012"),
-              "authority-level" => "owner"
-            }
-          ]
-        }
-      }
+  # Tests that make real API calls (using VCR)
+  describe "API interactions", :vcr do
+    let(:username) { ENV.fetch("TASTYTRADE_SANDBOX_USERNAME", nil) }
+    let(:password) { ENV.fetch("TASTYTRADE_SANDBOX_PASSWORD", nil) }
+    let(:account_number) { ENV.fetch("TASTYTRADE_SANDBOX_ACCOUNT", nil) }
+    let!(:session) do
+      sess = Tastytrade::Session.new(username: username, password: password, is_test: true)
+      sess.login if username && password
+      sess
+    end
+    let(:account) do
+      # Lazy load account only when needed
+      @account ||= described_class.get(session, account_number)
     end
 
-    it "returns array of Account objects" do
-      allow(session).to receive(:get).with("/customers/me/accounts/", {}).and_return(response)
-
-      accounts = described_class.get_all(session)
-
-      expect(accounts).to be_an(Array)
-      expect(accounts.size).to eq(2)
-      expect(accounts.first).to be_a(described_class)
-      expect(accounts.first.account_number).to eq("5WT0001")
-      expect(accounts.last.account_number).to eq("789012")
+    before do
+      skip "Missing sandbox credentials" unless username && password && account_number
     end
 
-    it "includes closed accounts when specified" do
-      allow(session).to receive(:get).with("/customers/me/accounts/", { "include-closed" => true })
-                                     .and_return(response)
+    describe ".get_all" do
+      it "returns array of Account objects" do
+        with_market_hours_check("account/get_all") do
+          accounts = described_class.get_all(session)
 
-      described_class.get_all(session, include_closed: true)
+          expect(accounts).to be_an(Array)
+          expect(accounts).not_to be_empty
+          expect(accounts.first).to be_a(described_class)
+          expect(accounts.first.account_number).not_to be_nil
+        end
+      end
+
+      it "includes closed accounts when specified" do
+        with_market_hours_check("account/get_all_with_closed") do
+          accounts = described_class.get_all(session, include_closed: true)
+          expect(accounts).to be_an(Array)
+        end
+      end
+    end
+
+    describe ".get" do
+      it "returns single Account object" do
+        with_market_hours_check("account/get_single") do
+          fetched_account = described_class.get(session, account_number)
+
+          expect(fetched_account).to be_a(described_class)
+          expect(fetched_account.account_number).to eq(account_number)
+          expect(fetched_account.nickname).not_to be_nil
+        end
+      end
+    end
+
+    describe "#get_balances" do
+      it "returns balance data" do
+        with_market_hours_check("account/get_balances") do
+          balance = account.get_balances(session)
+
+          expect(balance).to be_a(Tastytrade::Models::AccountBalance)
+          expect(balance.account_number).to eq(account_number)
+          expect(balance.cash_balance).to be_a(BigDecimal)
+          expect(balance.net_liquidating_value).to be_a(BigDecimal)
+        end
+      end
+    end
+
+    describe "#get_positions" do
+      it "returns array of positions" do
+        with_market_hours_check("account/get_positions") do
+          positions = account.get_positions(session)
+
+          expect(positions).to be_an(Array)
+          # Positions might be empty in sandbox
+          if positions.any?
+            expect(positions.first).to be_a(Tastytrade::Models::CurrentPosition)
+            expect(positions.first.symbol).not_to be_nil
+          end
+        end
+      end
+
+      it "filters positions by symbol" do
+        with_market_hours_check("account/get_positions_filtered") do
+          positions = account.get_positions(session, symbol: "SPY")
+          expect(positions).to be_an(Array)
+        end
+      end
+    end
+
+    describe "#get_trading_status" do
+      it "returns a TradingStatus object" do
+        with_market_hours_check("account/get_trading_status") do
+          status = account.get_trading_status(session)
+
+          expect(status).to be_a(Tastytrade::Models::TradingStatus)
+          expect(status.account_number).to eq(account_number)
+          expect(status.options_level).not_to be_nil
+        end
+      end
+    end
+
+    describe "#get_transactions" do
+      it "fetches transactions for the account" do
+        with_market_hours_check("account/get_transactions") do
+          transactions = account.get_transactions(session)
+
+          expect(transactions).to be_an(Array)
+          # Transactions might be empty in new sandbox account
+          if transactions.any?
+            expect(transactions.first).to be_a(Tastytrade::Models::Transaction)
+          end
+        end
+      end
+
+      it "filters transactions by date range" do
+        with_market_hours_check("account/get_transactions_filtered") do
+          start_date = Date.today - 30
+          end_date = Date.today
+
+          transactions = account.get_transactions(
+            session,
+            start_date: start_date,
+            end_date: end_date
+          )
+
+          expect(transactions).to be_an(Array)
+        end
+      end
+    end
+
+    describe "#get_live_orders" do
+      it "returns array of live orders" do
+        with_market_hours_check("account/get_live_orders") do
+          orders = account.get_live_orders(session)
+
+          expect(orders).to be_an(Array)
+          # Orders might be empty
+          if orders.any?
+            expect(orders.first).to be_a(Tastytrade::Models::LiveOrder)
+          end
+        end
+      end
+    end
+
+    describe "#get_order_history" do
+      it "returns historical orders" do
+        with_market_hours_check("account/get_order_history") do
+          orders = account.get_order_history(session)
+
+          expect(orders).to be_an(Array)
+          # History might be empty
+          if orders.any?
+            expect(orders.first).to be_a(Tastytrade::Models::LiveOrder)
+          end
+        end
+      end
     end
   end
 
@@ -228,49 +345,6 @@ RSpec.describe Tastytrade::Models::Account do
     describe "#foreign?" do
       it "returns false when is_foreign is false" do
         expect(account.foreign?).to be false
-      end
-    end
-
-    describe "#get_transactions" do
-      let(:transaction_data) do
-        {
-          "data" => {
-            "items" => [
-              {
-                "id" => 12345,
-                "account-number" => "5WT0001",
-                "symbol" => "AAPL",
-                "transaction-type" => "Trade",
-                "value" => "-1500.00"
-              }
-            ]
-          }
-        }
-      end
-
-      it "fetches transactions for the account" do
-        allow(Tastytrade::Models::Transaction).to receive(:get_all)
-          .with(session, "5WT0001")
-          .and_return([])
-
-        account.get_transactions(session)
-        expect(Tastytrade::Models::Transaction).to have_received(:get_all).with(session, "5WT0001")
-      end
-
-      it "passes through filter options" do
-        options = {
-          start_date: Date.new(2023, 1, 1),
-          end_date: Date.new(2023, 12, 31),
-          symbol: "AAPL"
-        }
-
-        allow(Tastytrade::Models::Transaction).to receive(:get_all)
-          .with(session, "5WT0001", **options)
-          .and_return([])
-
-        account.get_transactions(session, **options)
-        expect(Tastytrade::Models::Transaction).to have_received(:get_all)
-          .with(session, "5WT0001", **options)
       end
     end
   end

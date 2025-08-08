@@ -71,9 +71,44 @@ VCR.configure do |config|
     end
   end
 
-  config.filter_sensitive_data("<ACCOUNT_NUMBER>") do |interaction|
-    # Filter account numbers from URLs
-    interaction.request.uri.match(%r{/accounts/([^/]+)})&.captures&.first
+  # Use before_record hook to sanitize URIs instead of filter_sensitive_data
+  config.before_record do |interaction|
+    # Replace account numbers in URIs with a placeholder that forms a valid URI
+    if match = interaction.request.uri.match(%r{(/accounts/)([^/]+)(/?.*)}i)
+      prefix, account_number, suffix = match.captures
+      interaction.request.uri = interaction.request.uri.gsub(
+        %r{/accounts/[^/]+},
+        "/accounts/ACCOUNT_NUMBER_PLACEHOLDER"
+      )
+    end
+
+    # Also filter from response bodies
+    if interaction.response.body
+      account_number = interaction.request.uri.match(%r{/accounts/([^/]+)})&.captures&.first
+      if account_number
+        interaction.response.body = interaction.response.body.gsub(account_number, "ACCOUNT_NUMBER_PLACEHOLDER")
+      end
+    end
+  end
+
+  # Mirror the transformation for playback
+  config.before_playback do |interaction|
+    # During playback, replace placeholder with actual account number if available
+    account_number = ENV["TASTYTRADE_SANDBOX_ACCOUNT"]
+    if account_number && interaction.request.uri.include?("ACCOUNT_NUMBER_PLACEHOLDER")
+      interaction.request.uri = interaction.request.uri.gsub(
+        "ACCOUNT_NUMBER_PLACEHOLDER",
+        account_number
+      )
+    end
+
+    # Also replace in response bodies
+    if account_number && interaction.response.body&.include?("ACCOUNT_NUMBER_PLACEHOLDER")
+      interaction.response.body = interaction.response.body.gsub(
+        "ACCOUNT_NUMBER_PLACEHOLDER",
+        account_number
+      )
+    end
   end
 
   config.filter_sensitive_data("<USERNAME>") do |interaction|
@@ -130,10 +165,22 @@ VCR.configure do |config|
     uri_1.to_s == uri_2.to_s
   end
 
+  # Custom request matcher for account number normalization
+  config.register_request_matcher :uri_with_normalized_accounts do |request_1, request_2|
+    # Helper to normalize account URIs for comparison
+    normalize_uri = lambda do |uri_string|
+      uri_string.gsub(%r{/accounts/[^/]+}, "/accounts/ACCOUNT_NUMBER_PLACEHOLDER")
+    end
+
+    uri_1 = normalize_uri.call(request_1.uri)
+    uri_2 = normalize_uri.call(request_2.uri)
+    uri_1 == uri_2
+  end
+
   # Default cassette options
   config.default_cassette_options = {
     record: vcr_mode,
-    match_requests_on: [:method, :uri_without_timestamp, :body],
+    match_requests_on: [:method, :uri_with_normalized_accounts, :uri_without_timestamp, :body],
     allow_playback_repeats: true,
     serialize_with: :yaml,
     preserve_exact_body_bytes: true,

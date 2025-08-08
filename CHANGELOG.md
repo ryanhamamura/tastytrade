@@ -8,7 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- VCR test framework implementation (#42)
+- VCR test framework implementation - PR #2: Account & Model Classes (#42)
+  - Converted Account model tests from mocks to VCR with real API calls
+  - Converted Transaction model tests to use VCR recordings
+  - Converted order placement tests with idempotent test patterns
+  - Created OrderTestHelper for automated order cleanup
+  - Implemented one-cassette-per-test organization pattern
+  - Removed duplicate account method test files
+  - Added lazy session loading for VCR compatibility
+  - Pure Ruby model tests left unchanged (no API calls)
+- VCR test framework implementation - PR #1: Foundation & Session (#42)
   - Replaced WebMock-based mocks with real API recordings via VCR
   - Added comprehensive VCR configuration with sensitive data filtering
   - Implemented market hours helper for Tastytrade sandbox constraints
