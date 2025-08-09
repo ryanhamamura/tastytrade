@@ -8,10 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Nothing yet
+- Interactive orders menu system (#49)
+  - New hierarchical orders submenu replacing single order placement
+  - Three-tier place order system (Quick/Standard/Advanced modes)
+  - Interactive wrappers for all Thor order subcommands:
+    - List orders with filters (status, symbol) and auto-refresh capability
+    - Order history with date range, status, and symbol filters
+    - Get order details by ID
+    - Cancel orders with visual selection
+    - Replace/modify existing orders
+  - Enhanced error handling with human-readable messages
+  - Context-aware confirmations (SANDBOX vs PRODUCTION warnings)
+  - Session management via instance variable injection to Thor commands
+  - Vim-style navigation throughout all menus
+  - Status colorization for better visual feedback
 
 ### Changed
-- Nothing yet
+- Main menu "Orders" option now opens comprehensive orders management submenu
+- Order operations return to orders submenu instead of main menu
 
 ### Deprecated
 - Nothing yet

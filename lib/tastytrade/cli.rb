@@ -858,7 +858,7 @@ module Tastytrade
         when :history
           interactive_history
         when :orders
-          interactive_order
+          interactive_orders_menu
         when :settings
           info "Settings command not yet implemented"
         when :exit
@@ -884,7 +884,7 @@ module Tastytrade
         menu.choice "Portfolio - View holdings", :portfolio
         menu.choice "Positions - View open positions", :positions
         menu.choice "History - View transaction history", :history
-        menu.choice "Orders - View recent orders", :orders
+        menu.choice "Orders - Manage orders", :orders
         menu.choice "Settings - Configure preferences", :settings
         menu.choice "Exit", :exit
       end
@@ -1284,6 +1284,421 @@ module Tastytrade
     rescue => e
       error "Failed to place order: #{e.message}"
       prompt.keypress("\nPress any key to continue...")
+    end
+
+    def interactive_orders_menu
+      loop do
+        menu_prompt = create_vim_prompt
+
+        choice = menu_prompt.select("Orders Menu", per_page: 10) do |menu|
+          menu.enum "."
+          menu.help "(Use ↑/↓ arrows, vim j/k, numbers, q or ESC to go back)"
+
+          menu.choice "List Orders - View live orders", :list
+          menu.choice "Order History - View past orders", :history
+          menu.choice "Place Order - Create new order", :place
+          menu.choice "Get Order - View order details", :get
+          menu.choice "Cancel Order - Cancel an order", :cancel
+          menu.choice "Replace Order - Modify existing order", :replace
+          menu.choice "Back to Main Menu", :back
+        end
+
+        return if @exit_requested || choice == :back
+
+        case choice
+        when :list
+          interactive_list_orders
+        when :history
+          interactive_order_history
+        when :place
+          interactive_place_order_advanced
+        when :get
+          interactive_get_order
+        when :cancel
+          interactive_cancel_order
+        when :replace
+          interactive_replace_order
+        end
+      end
+    end
+
+    def with_error_handling(&block)
+      block.call
+    rescue SystemExit => e
+      # Catch Thor's exit calls
+      nil
+    rescue Tastytrade::InvalidCredentialsError => e
+      show_error("Authentication failed", "Your session has expired. Please login again.")
+    rescue Tastytrade::OrderAlreadyFilledError => e
+      show_error("Order already filled", "This order has already been executed and cannot be modified.")
+    rescue Tastytrade::InsufficientFundsError => e
+      show_error("Insufficient funds", "You don't have enough buying power for this order.")
+    rescue Tastytrade::MarketClosedError => e
+      show_error("Market closed", "Orders cannot be placed while the market is closed.")
+    rescue Tastytrade::NetworkTimeoutError => e
+      show_error("Network timeout", "Connection timed out. Please check your internet and try again.")
+    rescue Tastytrade::Error => e
+      show_error("Operation failed", e.message)
+    rescue StandardError => e
+      show_error("Unexpected error", "An unexpected error occurred: #{e.message}")
+    ensure
+      prompt.keypress("\nPress any key to continue...", timeout: 30)
+    end
+
+    def show_error(title, message)
+      puts ""
+      puts pastel.red.bold("✗ #{title}")
+      puts pastel.red("  #{message}")
+      puts ""
+    end
+
+    def interactive_list_orders
+      account = @current_account || current_account || select_account_interactively
+      return unless account
+
+      filter_prompt = create_vim_prompt
+      filter = filter_prompt.select("Filter orders by:", per_page: 5) do |menu|
+        menu.enum "."
+        menu.help "(Select filter or press q/ESC to skip)"
+        menu.choice "All orders", :all
+        menu.choice "By status", :status
+        menu.choice "By symbol", :symbol
+      end
+
+      return if @exit_requested
+
+      options = { account: account.account_number }
+
+      case filter
+      when :status
+        status_options = ["Live", "Filled", "Cancelled", "Expired"]
+        status = prompt.select("Select status:", status_options)
+        options[:status] = status
+      when :symbol
+        symbol = prompt.ask("Enter symbol:") { |q| q.modify :up }.upcase
+        options[:symbol] = symbol
+      end
+
+      orders_command = Tastytrade::CLI::Orders.new
+      orders_command.instance_variable_set(:@current_session, current_session)
+      orders_command.options = options
+
+      with_error_handling do
+        orders_command.list
+      end
+
+      # Auto-refresh option
+      if prompt.yes?("Auto-refresh orders? (updates every 5 seconds)")
+        loop do
+          sleep(5)
+          system("clear")
+          orders_command.list
+          break if prompt.keypress("Press any key to stop auto-refresh...", timeout: 0.1)
+        end
+      end
+    end
+
+    def interactive_order_history
+      account = @current_account || current_account || select_account_interactively
+      return unless account
+
+      # Date range filter
+      filter_by_date = prompt.yes?("Filter by date range?")
+
+      options = { account: account.account_number }
+
+      if filter_by_date
+        begin
+          from_date = prompt.ask("Enter start date (YYYY-MM-DD):") do |q|
+            q.validate(/^\d{4}-\d{2}-\d{2}$/, "Must be in YYYY-MM-DD format")
+          end
+          options[:from] = from_date
+
+          to_date = prompt.ask("Enter end date (YYYY-MM-DD):") do |q|
+            q.validate(/^\d{4}-\d{2}-\d{2}$/, "Must be in YYYY-MM-DD format")
+          end
+          options[:to] = to_date
+        rescue Date::Error => e
+          error "Invalid date: #{e.message}"
+          prompt.keypress("\nPress any key to continue...")
+          return
+        end
+      end
+
+      # Symbol filter
+      filter_by_symbol = prompt.yes?("Filter by symbol?")
+      if filter_by_symbol
+        symbol = prompt.ask("Enter symbol:") { |q| q.modify :up }.upcase
+        options[:symbol] = symbol
+      end
+
+      # Status filter
+      filter_by_status = prompt.yes?("Filter by status?")
+      if filter_by_status
+        status_options = ["Filled", "Cancelled", "Expired", "Rejected"]
+        status = prompt.select("Select status:", status_options)
+        options[:status] = status
+      end
+
+      orders_command = Tastytrade::CLI::Orders.new
+      orders_command.instance_variable_set(:@current_session, current_session)
+      orders_command.options = options
+
+      with_error_handling do
+        orders_command.history
+      end
+    end
+
+    def interactive_place_order_advanced
+      menu_prompt = create_vim_prompt
+
+      order_mode = menu_prompt.select("Order Entry Mode:", per_page: 3) do |menu|
+        menu.enum "."
+        menu.help "(Select order complexity level)"
+        menu.choice "Quick Order - Basic market/limit orders", :quick
+        menu.choice "Standard Order - Common order types with options", :standard
+        menu.choice "Advanced Order - All order types and conditions", :advanced
+      end
+
+      return if @exit_requested
+
+      case order_mode
+      when :quick
+        interactive_place_order_quick
+      when :standard
+        interactive_place_order_standard
+      when :advanced
+        interactive_place_order_full
+      end
+    end
+
+    def interactive_place_order_quick
+      puts pastel.cyan.bold("\n📝 Quick Order Entry\n")
+
+      symbol = prompt.ask("Symbol:") { |q| q.modify :up }.upcase
+      action = prompt.select("Action:") do |menu|
+        menu.choice "Buy", "buy_to_open"
+        menu.choice "Sell", "sell_to_close"
+      end
+      quantity = prompt.ask("Quantity:", convert: :int)
+      order_type = prompt.select("Order type:") do |menu|
+        menu.choice "Market (immediate execution)", "market"
+        menu.choice "Limit (set your price)", "limit"
+      end
+
+      price = nil
+      if order_type == "limit"
+        price = prompt.ask("Limit price:", convert: :float)
+      end
+
+      account = @current_account || current_account || select_account_interactively
+      return unless account
+
+      # Delegate to Thor command
+      orders_command = Tastytrade::CLI::Orders.new
+      orders_command.instance_variable_set(:@current_session, current_session)
+      orders_command.instance_variable_set(:@current_account, account)
+      orders_command.options = {
+        account: account.account_number,
+        symbol: symbol,
+        action: action,
+        quantity: quantity,
+        type: order_type,
+        price: price,
+        time_in_force: "day"
+      }
+
+      with_error_handling do
+        orders_command.place
+      end
+    end
+
+    def interactive_place_order_standard
+      puts pastel.cyan.bold("\n📊 Standard Order Entry\n")
+
+      symbol = prompt.ask("Symbol:") { |q| q.modify :up }.upcase
+
+      action = prompt.select("Action:") do |menu|
+        menu.choice "Buy to Open", "buy_to_open"
+        menu.choice "Sell to Close", "sell_to_close"
+        menu.choice "Sell to Open (Short)", "sell_to_open"
+        menu.choice "Buy to Close (Cover)", "buy_to_close"
+      end
+
+      quantity = prompt.ask("Quantity:", convert: :int)
+
+      order_type = prompt.select("Order type:") do |menu|
+        menu.choice "Market", "market"
+        menu.choice "Limit", "limit"
+        menu.choice "Stop", "stop"
+      end
+
+      price = nil
+      if order_type == "limit"
+        price = prompt.ask("Limit price:", convert: :float)
+      elsif order_type == "stop"
+        price = prompt.ask("Stop price:", convert: :float)
+      end
+
+      time_in_force = prompt.select("Time in force:") do |menu|
+        menu.choice "Day (expires at close)", "day"
+        menu.choice "GTC (good till cancelled)", "gtc"
+      end
+
+      account = @current_account || current_account || select_account_interactively
+      return unless account
+
+      # Confirmation
+      puts "\nOrder Summary:"
+      puts "  Symbol: #{symbol}"
+      puts "  Action: #{action}"
+      puts "  Quantity: #{quantity}"
+      puts "  Type: #{order_type}"
+      puts "  Price: #{price ? format_currency(price) : "Market"}"
+      puts "  Time in Force: #{time_in_force.upcase}"
+      puts "  Account: #{account.account_number}"
+
+      unless prompt.yes?("\nPlace this order?")
+        info "Order cancelled"
+        return
+      end
+
+      orders_command = Tastytrade::CLI::Orders.new
+      orders_command.instance_variable_set(:@current_session, current_session)
+      orders_command.instance_variable_set(:@current_account, account)
+      orders_command.options = {
+        account: account.account_number,
+        symbol: symbol,
+        action: action,
+        quantity: quantity,
+        type: order_type,
+        price: price,
+        time_in_force: time_in_force,
+        skip_confirmation: true
+      }
+
+      with_error_handling do
+        orders_command.place
+      end
+    end
+
+    def interactive_place_order_full
+      info "Advanced order placement with all options"
+
+      # Reuse the existing interactive_order method for now
+      # This will be enhanced later with more advanced features
+      interactive_order
+    end
+
+    def interactive_get_order
+      account = @current_account || current_account || select_account_interactively
+      return unless account
+
+      order_id = prompt.ask("Enter Order ID:")
+
+      orders_command = Tastytrade::CLI::Orders.new
+      orders_command.instance_variable_set(:@current_session, current_session)
+      orders_command.options = { account: account.account_number }
+
+      with_error_handling do
+        orders_command.get(order_id)
+      end
+    end
+
+    def interactive_cancel_order
+      account = @current_account || current_account || select_account_interactively
+      return unless account
+
+      info "Fetching cancellable orders..."
+      orders = account.get_live_orders(current_session).select(&:cancellable?)
+
+      if orders.empty?
+        warning "No cancellable orders found"
+        return
+      end
+
+      choices = orders.map do |order|
+        leg = order.legs.first
+        description = [
+          order.underlying_symbol,
+          leg&.action,
+          "#{leg&.quantity} shares",
+          format_currency(order.price),
+          colorize_status(order.status)
+        ].compact.join(" | ")
+
+        { name: "#{order.id[0..7]}... - #{description}", value: order.id }
+      end
+
+      order_id = prompt.select("Select order to cancel:", choices)
+
+      # Context-aware confirmation
+      confirm_message = if current_session.instance_variable_get(:@is_test)
+        "Cancel this order? (SANDBOX)"
+      else
+        pastel.red("Cancel this order? (PRODUCTION - This action cannot be undone)")
+      end
+
+      return unless prompt.yes?(confirm_message)
+
+      orders_command = Tastytrade::CLI::Orders.new
+      orders_command.instance_variable_set(:@current_session, current_session)
+      orders_command.options = { account: account.account_number }
+
+      with_error_handling do
+        orders_command.cancel(order_id)
+      end
+    end
+
+    def interactive_replace_order
+      account = @current_account || current_account || select_account_interactively
+      return unless account
+
+      info "Fetching editable orders..."
+      orders = account.get_live_orders(current_session).select(&:editable?)
+
+      if orders.empty?
+        warning "No editable orders found"
+        return
+      end
+
+      choices = orders.map do |order|
+        leg = order.legs.first
+        description = [
+          order.underlying_symbol,
+          leg&.action,
+          "#{leg&.quantity} shares",
+          format_currency(order.price),
+          colorize_status(order.status)
+        ].compact.join(" | ")
+
+        { name: "#{order.id[0..7]}... - #{description}", value: order.id }
+      end
+
+      order_id = prompt.select("Select order to replace:", choices)
+
+      orders_command = Tastytrade::CLI::Orders.new
+      orders_command.instance_variable_set(:@current_session, current_session)
+      orders_command.options = { account: account.account_number }
+
+      with_error_handling do
+        orders_command.replace(order_id)
+      end
+    end
+
+    def colorize_status(status)
+      case status
+      when "Live"
+        pastel.green(status)
+      when "Filled"
+        pastel.blue(status)
+      when "Cancelled", "Rejected", "Expired"
+        pastel.red(status)
+      when "Received", "Routed"
+        pastel.yellow(status)
+      else
+        status
+      end
     end
   end
 end
