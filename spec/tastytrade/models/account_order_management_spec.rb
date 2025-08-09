@@ -54,7 +54,7 @@ RSpec.describe Tastytrade::Models::Account, "#get_live_orders" do
   end
 
   describe "without filters" do
-    it "retrieves all live orders", :vcr do
+    it "retrieves all live orders" do
       allow(session).to receive(:get)
         .with("/accounts/5WV12345/orders/live/", {})
         .and_return(live_orders_response)
@@ -122,7 +122,7 @@ RSpec.describe Tastytrade::Models::Account, "#cancel_order" do
   let(:order_id) { "12345" }
 
   describe "successful cancellation" do
-    it "sends DELETE request and returns nil", :vcr do
+    it "sends DELETE request and returns nil" do
       expect(session).to receive(:delete)
         .with("/accounts/5WV12345/orders/12345/")
         .and_return(nil)
@@ -210,7 +210,7 @@ RSpec.describe Tastytrade::Models::Account, "#replace_order" do
   end
 
   describe "successful replacement" do
-    it "sends PUT request and returns OrderResponse", :vcr do
+    it "sends PUT request and returns OrderResponse" do
       expect(new_order).to receive(:to_api_params).and_return(order_params)
       expect(session).to receive(:put)
         .with("/accounts/5WV12345/orders/12345/", order_params)

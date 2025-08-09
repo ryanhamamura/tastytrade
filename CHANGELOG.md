@@ -76,7 +76,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `order replace` command with interactive price/quantity modification
   - Partial fill tracking with filled/remaining quantity calculations
   - Order status color coding in CLI output
-  - VCR test configuration with sensitive data filtering
   - Comprehensive test coverage for all order management features
   - Integration tests for complete order lifecycle (place, list, modify, cancel)
   - Renamed existing `order` command to `place` for clarity
