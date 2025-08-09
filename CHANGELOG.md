@@ -25,6 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Nothing yet
 
+## [0.3.1] - 2025-08-08
+
+### Removed
+- VCR documentation files (vcr_implementation_plan.md, vcr_implementation_research.md) that were inadvertently included in v0.3.0
+- VCR gem dependency from development dependencies
+- VCR configuration and setup code from spec_helper.rb
+- VCR-related test tags from spec files
+
+### Fixed
+- Cleaned up test suite to remove unused VCR references
+
 ## [0.3.0] - 2025-08-08
 
 ### Added
