@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Core Option and OptionChain models (#51)
+  - Option model with comprehensive attributes:
+    - Core identifiers (symbol, root_symbol, underlying_symbol, streamer_symbol)
+    - Option specifications (type, expiration, strike, contract size, exercise style)
+    - Greeks (delta, gamma, theta, vega, rho, implied volatility)
+    - Pricing data (bid, ask, last, mark, volume, open interest)
+  - Symbol conversion utilities (OCC ↔ Streamer format)
+  - Moneyness calculations (ITM/OTM/ATM) with configurable thresholds
+  - Intrinsic and extrinsic value calculations
+  - Helper methods (call?, put?, expired?, days_until_expiration)
+  - OptionChain model for managing collections of options:
+    - Automatic grouping by expiration dates
+    - Filtering by expiration, strikes, moneyness, DTE
+    - Calls/puts separation
+    - ATM strike finding and nearest strikes selection
+    - Support for weekly, monthly, and quarterly expirations
+  - NestedOptionChain model for hierarchical chain structure:
+    - Nested Strike and Expiration models
+    - Expiration type detection (weekly/monthly/quarterly)
+    - Option symbol lookup by strike and expiration
+  - API integration methods (Option.get, OptionChain.get_chain, NestedOptionChain.get)
+  - Full compatibility with existing CurrentPosition option fields
+  - Comprehensive test coverage (134 examples, 100% passing)
 - Interactive orders menu system (#49)
   - New hierarchical orders submenu replacing single order placement
   - Three-tier place order system (Quick/Standard/Advanced modes)
