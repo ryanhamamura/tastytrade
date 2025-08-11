@@ -11,3 +11,9 @@
 /*.gem
 /.rubocop-https--*
 /.rubocop-cache/
+
+# Environment files with credentials
+.env
+.env.sandbox
+.env.production
+.env.local

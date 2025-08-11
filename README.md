@@ -103,25 +103,29 @@ The gem includes a command-line interface for common operations:
 
 #### Authentication
 
+See [docs/CREDENTIALS.md](docs/CREDENTIALS.md) for detailed credential management.
+
 ```bash
-# Login to your account interactively
-tastytrade login
+# Setup credentials with .env files (recommended)
+cp .env.example .env                    # For production
+cp .env.sandbox.example .env.sandbox    # For sandbox testing
+
+# Login to production
+tastytrade login                        # Uses .env file
+
+# Login to sandbox (testing)
+tastytrade login --test                 # Uses .env.sandbox file
 
 # Login with remember option for automatic session refresh
 tastytrade login --remember
 
-# Login using environment variables (recommended for automation)
+# Login using environment variables
 export TASTYTRADE_USERNAME="your_email@example.com"
 export TASTYTRADE_PASSWORD="your_password"
 tastytrade login
 
-# Or use shorter variable names
-export TT_USERNAME="your_email@example.com"
-export TT_PASSWORD="your_password"
-tastytrade login
-
-# Use sandbox environment for testing
-export TASTYTRADE_ENVIRONMENT="sandbox"
+# Login interactively
+tastytrade login --username user@example.com  # Password will be prompted
 tastytrade login
 
 # Enable remember token via environment

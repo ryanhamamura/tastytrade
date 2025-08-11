@@ -7,6 +7,7 @@ require_relative "cli_helpers"
 require_relative "cli_config"
 require_relative "session_manager"
 require_relative "cli/orders"
+require_relative "cli/options"
 
 module Tastytrade
   # Main CLI class for Tastytrade gem
@@ -49,7 +50,7 @@ module Tastytrade
     option :no_interactive, type: :boolean, default: false, desc: "Skip interactive mode after login"
     def login
       # Try environment variables first
-      if (session = Session.from_environment)
+      if (session = Session.from_environment(is_test: options[:test]))
         environment = session.instance_variable_get(:@is_test) ? "sandbox" : "production"
         info "Using credentials from environment variables..."
         info "Logging in to #{environment} environment..."
@@ -759,6 +760,9 @@ module Tastytrade
     # Register the Orders subcommand
     desc "order SUBCOMMAND ...ARGS", "Manage orders"
     subcommand "order", CLI::Orders
+
+    desc "option SUBCOMMAND ...ARGS", "Options trading commands"
+    subcommand "option", CLI::Options
 
     desc "place SYMBOL QUANTITY", "Place an order for equities"
     option :type, default: "market", desc: "Order type (market or limit)"

@@ -352,12 +352,9 @@ RSpec.describe "Option Order Integration", :integration do
     end
 
     it "creates and validates a long straddle" do
-      option_strike = { symbol: "IWM", strike: 200 }
-      expiration = Date.new(2024, 1, 19)
-
       order = builder.straddle(
-        option_strike,
-        expiration,
+        put_option,
+        call_option,
         1,
         action: Tastytrade::OrderAction::BUY_TO_OPEN,
         price: BigDecimal("10.50")

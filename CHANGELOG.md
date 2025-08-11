@@ -8,6 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Option order placement and multi-leg strategies (#54, #56, #57, #58, #59)
+  - Complete CLI commands for options trading:
+    - `option chain` - Display option chains with filters
+    - `option quote` - Get quotes for specific option contracts
+    - `option buy` - Buy call or put options
+    - `option sell` - Sell call or put options
+    - `option spread` - Create vertical spreads
+    - `option strangle` - Create strangle positions
+    - `option straddle` - Create straddle positions
+  - OptionOrderBuilder class for programmatic order creation:
+    - Single-leg orders (buy_call, buy_put, sell_call, sell_put)
+    - Multi-leg strategies (vertical_spread, strangle, straddle, iron_condor)
+    - Automatic net debit/credit calculation
+    - Proper action sequencing (buy before sell)
+  - Option selection methods:
+    - By explicit strike and expiration
+    - By delta targeting
+    - By days to expiration (DTE)
+    - ATM strike selection
+  - Order validation and dry-run support:
+    - All commands support --dry-run flag for testing
+    - Visual order confirmation with account context (SANDBOX vs PRODUCTION)
+    - Limit price specification or automatic mid-price calculation
+  - Comprehensive OPTIONS_CLI_GUIDE.md documentation
+  - Test scripts for validation (test_option_commands.rb, test_cli_commands.sh)
 - Advanced option chain display formatter with colors and Greeks (#55)
   - Created `OptionChainFormatter` class for professional option chain visualization:
     - ITM/ATM/OTM color coding (green/yellow/red)

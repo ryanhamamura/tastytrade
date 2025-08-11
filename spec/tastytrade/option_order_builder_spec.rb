@@ -363,16 +363,9 @@ RSpec.describe Tastytrade::OptionOrderBuilder do
     end
 
     describe "#straddle" do
-      before do
-        allow(Tastytrade::Models::Option).to receive(:get).and_return(put_option, call_option)
-      end
-
       it "creates a long straddle" do
-        option_strike = { symbol: "AAPL", strike: 150 }
-        expiration = Date.new(2024, 1, 19)
-
         order = builder.straddle(
-          option_strike, expiration, 1,
+          put_option, call_option, 1,
           action: Tastytrade::OrderAction::BUY_TO_OPEN,
           price: BigDecimal("6.00")
         )
@@ -383,21 +376,56 @@ RSpec.describe Tastytrade::OptionOrderBuilder do
         expect(order.legs.size).to eq(2)
 
         expect(order.legs[0].action).to eq(Tastytrade::OrderAction::BUY_TO_OPEN)
+        expect(order.legs[0].symbol).to eq("AAPL 240119P00150000")
+
         expect(order.legs[1].action).to eq(Tastytrade::OrderAction::BUY_TO_OPEN)
+        expect(order.legs[1].symbol).to eq("AAPL 240119C00150000")
       end
 
       it "creates a short straddle" do
-        option_strike = { symbol: "AAPL", strike: 150 }
-        expiration = Date.new(2024, 1, 19)
-
         order = builder.straddle(
-          option_strike, expiration, 1,
+          put_option, call_option, 1,
           action: Tastytrade::OrderAction::SELL_TO_OPEN,
           price: BigDecimal("6.00")
         )
 
         expect(order.legs[0].action).to eq(Tastytrade::OrderAction::SELL_TO_OPEN)
+        expect(order.legs[0].symbol).to eq("AAPL 240119P00150000")
+
         expect(order.legs[1].action).to eq(Tastytrade::OrderAction::SELL_TO_OPEN)
+        expect(order.legs[1].symbol).to eq("AAPL 240119C00150000")
+      end
+
+      it "validates put and call have same strike" do
+        different_strike_call = instance_double(
+          Tastytrade::Models::Option,
+          symbol: "AAPL 240119C00155000",
+          option_type: "C",
+          strike_price: BigDecimal("155"),
+          expiration_date: Date.new(2024, 1, 19),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+
+        expect {
+          builder.straddle(put_option, different_strike_call, 1)
+        }.to raise_error(Tastytrade::OptionOrderBuilder::InvalidStrategyError, /same strike price/)
+      end
+
+      it "validates put and call have same expiration" do
+        different_exp_call = instance_double(
+          Tastytrade::Models::Option,
+          symbol: "AAPL 240216C00150000",
+          option_type: "C",
+          strike_price: BigDecimal("150"),
+          expiration_date: Date.new(2024, 2, 16),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+
+        expect {
+          builder.straddle(put_option, different_exp_call, 1)
+        }.to raise_error(Tastytrade::OptionOrderBuilder::InvalidStrategyError, /same expiration/)
       end
     end
   end
