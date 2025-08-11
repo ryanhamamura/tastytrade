@@ -608,6 +608,84 @@ module Tastytrade
       exit 1
     end
 
+    desc "option", "Display option chain for a symbol"
+    option :symbol, type: :string, required: true, desc: "Symbol to get option chain for"
+    option :strikes, type: :numeric, desc: "Limit number of strikes around ATM"
+    option :dte, type: :numeric, desc: "Max days to expiration"
+    option :moneyness, type: :string, enum: %w[ITM ATM OTM ALL], desc: "Filter by moneyness"
+    option :expiration_type, type: :string, enum: %w[weekly monthly quarterly all], desc: "Filter by expiration type"
+    option :format, type: :string, enum: %w[table json compact], default: "table", desc: "Output format"
+    option :nested, type: :boolean, default: false, desc: "Use nested chain format"
+    # Display option chain with filtering and formatting options
+    #
+    # @example Display full option chain
+    #   tastytrade option --symbol SPY
+    #
+    # @example Display 5 strikes around ATM for near-term expirations
+    #   tastytrade option --symbol SPY --strikes 5 --dte 30
+    #
+    # @example Display only ITM options in JSON format
+    #   tastytrade option --symbol SPY --moneyness ITM --format json
+    #
+    # @example Display only monthly expirations
+    #   tastytrade option --symbol SPY --expiration-type monthly
+    #
+    # @return [void]
+    def option
+      require_authentication!
+
+      symbol = options[:symbol].upcase
+      info "Fetching option chain for #{symbol}..."
+
+      begin
+        # Get the option chain
+        chain = if options[:nested]
+          Tastytrade::Models::NestedOptionChain.get(current_session, symbol)
+        else
+          Tastytrade::Models::OptionChain.get_chain(current_session, symbol)
+        end
+
+        # Apply filters
+        if options[:dte]
+          chain = chain.filter_by_dte(max_dte: options[:dte])
+        end
+
+        if options[:strikes] && !options[:nested]
+          # For compact chain, need to get current price
+          # For now, we'll skip this filter for compact chains
+          info "Note: --strikes filter requires current price (not implemented yet)"
+        end
+
+        if options[:expiration_type] && options[:expiration_type] != "all"
+          case options[:expiration_type]
+          when "weekly"
+            chain = chain.weekly_expirations
+          when "monthly"
+            chain = chain.monthly_expirations
+          when "quarterly"
+            chain = chain.quarterly_expirations
+          end
+        end
+
+        # Display based on format
+        case options[:format]
+        when "json"
+          display_option_chain_json(chain)
+        when "compact"
+          display_option_chain_compact(chain)
+        else
+          display_option_chain_table(chain)
+        end
+
+      rescue Tastytrade::Error => e
+        error "Failed to fetch option chain: #{e.message}"
+        exit 1
+      rescue StandardError => e
+        error "Unexpected error: #{e.message}"
+        exit 1
+      end
+    end
+
     desc "status", "Check session status"
     def status
       session = current_session
@@ -859,6 +937,8 @@ module Tastytrade
           interactive_history
         when :orders
           interactive_orders_menu
+        when :options
+          interactive_options
         when :settings
           info "Settings command not yet implemented"
         when :exit
@@ -885,6 +965,7 @@ module Tastytrade
         menu.choice "Positions - View open positions", :positions
         menu.choice "History - View transaction history", :history
         menu.choice "Orders - Manage orders", :orders
+        menu.choice "Options - Browse option chains", :options
         menu.choice "Settings - Configure preferences", :settings
         menu.choice "Exit", :exit
       end
@@ -1284,6 +1365,183 @@ module Tastytrade
     rescue => e
       error "Failed to place order: #{e.message}"
       prompt.keypress("\nPress any key to continue...")
+    end
+
+    # Interactive option chain browsing with menu-driven navigation
+    #
+    # Provides a complete interactive workflow for browsing option chains,
+    # selecting expirations and strikes, and creating orders.
+    #
+    # @return [void]
+    def interactive_options
+      # Get symbol from user
+      symbol = prompt.ask("Enter symbol for option chain:") do |q|
+        q.modify :up
+        q.required true
+      end
+
+      info "Fetching option chain for #{symbol}..."
+
+      begin
+        # Get the option chain
+        chain = Tastytrade::Models::NestedOptionChain.get(current_session, symbol)
+
+        if chain.expirations.empty?
+          warning "No options available for #{symbol}"
+          return
+        end
+
+        # Select expiration
+        expiration = select_expiration_interactively(chain)
+        return unless expiration
+
+        # Select strike
+        strike = select_strike_interactively(expiration)
+        return unless strike
+
+        # Select call or put
+        option_type = prompt.select("Select option type:", ["Call", "Put", "Back"])
+        return if option_type == "Back"
+
+        # Get the selected option symbol
+        selected_symbol = option_type == "Call" ? strike.call : strike.put
+
+        # Show option details and actions
+        show_option_details_menu(selected_symbol, strike, expiration, option_type)
+
+      rescue Tastytrade::Error => e
+        error "Failed to fetch option chain: #{e.message}"
+      end
+    end
+
+    # Select an expiration date from available options
+    #
+    # @param chain [Tastytrade::Models::NestedOptionChain] The option chain to select from
+    # @return [Tastytrade::Models::NestedOptionChain::Expiration, nil] Selected expiration or nil if cancelled
+    def select_expiration_interactively(chain)
+      choices = chain.expirations.map do |exp|
+        desc = "#{exp.expiration_date} (#{exp.days_to_expiration} DTE) - #{exp.expiration_type}"
+        { name: desc, value: exp }
+      end
+
+      choices << { name: "Back to main menu", value: :back }
+
+      result = prompt.select("Select expiration:", choices, per_page: 15)
+      return nil if result == :back
+      result
+    end
+
+    # Select a strike price from available options for an expiration
+    #
+    # @param expiration [Tastytrade::Models::NestedOptionChain::Expiration] The expiration to select strikes from
+    # @return [Tastytrade::Models::NestedOptionChain::Strike, nil] Selected strike or nil if cancelled
+    def select_strike_interactively(expiration)
+      # Group strikes around ATM for easier selection
+      strikes = expiration.strikes
+
+      # Sort by strike price
+      strikes_sorted = strikes.sort_by { |s| s.strike_price.to_f }
+
+      # Create choices with both call and put info
+      choices = strikes_sorted.map do |strike|
+        strike_str = format_price(strike.strike_price)
+        desc = "Strike #{strike_str} | Call: #{strike.call || "N/A"} | Put: #{strike.put || "N/A"}"
+        { name: desc, value: strike }
+      end
+
+      choices << { name: "Back to expirations", value: :back }
+
+      result = prompt.select("Select strike:", choices, per_page: 20)
+      return nil if result == :back
+      result
+    end
+
+    # Display option details and action menu
+    #
+    # Shows option contract details and provides actions like creating buy/sell orders.
+    #
+    # @param symbol [String] The option symbol
+    # @param strike [Tastytrade::Models::NestedOptionChain::Strike] The selected strike
+    # @param expiration [Tastytrade::Models::NestedOptionChain::Expiration] The selected expiration
+    # @param option_type [String] Either "Call" or "Put"
+    # @return [void]
+    def show_option_details_menu(symbol, strike, expiration, option_type)
+      loop do
+        puts
+        puts pastel.bold("Option Details")
+        puts "Symbol: #{symbol}"
+        puts "Type: #{option_type}"
+        puts "Strike: #{format_price(strike.strike_price)}"
+        puts "Expiration: #{expiration.expiration_date} (#{expiration.days_to_expiration} DTE)"
+        puts "Settlement: #{expiration.settlement_type}"
+        puts
+
+        choice = prompt.select("What would you like to do?") do |menu|
+          menu.choice "Create Buy Order", :buy
+          menu.choice "Create Sell Order", :sell
+          menu.choice "View current quotes (not implemented)", :quotes
+          menu.choice "Add to watchlist (not implemented)", :watchlist
+          menu.choice "Back to strikes", :back
+        end
+
+        case choice
+        when :buy
+          create_option_order(symbol, "Buy", option_type)
+        when :sell
+          create_option_order(symbol, "Sell", option_type)
+        when :quotes
+          info "Quote viewing not yet implemented"
+        when :watchlist
+          info "Watchlist feature not yet implemented"
+        when :back
+          break
+        end
+      end
+    end
+
+    # Create an option order interactively
+    #
+    # Prompts for order details and submits the order (placeholder implementation).
+    #
+    # @param symbol [String] The option symbol
+    # @param action [String] Either "Buy" or "Sell"
+    # @param option_type [String] Either "Call" or "Put"
+    # @return [void]
+    def create_option_order(symbol, action, option_type)
+      account = @current_account || current_account || select_account_interactively
+      return unless account
+
+      # Get quantity
+      quantity = prompt.ask("Enter number of contracts:", convert: :int) do |q|
+        q.validate { |v| v.to_i > 0 }
+        q.messages[:valid?] = "Quantity must be greater than 0"
+      end
+
+      # Get order type
+      order_type = prompt.select("Select order type:", ["Market", "Limit", "Cancel"])
+      return if order_type == "Cancel"
+
+      price = nil
+      if order_type == "Limit"
+        price = prompt.ask("Enter limit price per contract:", convert: :float) do |q|
+          q.validate { |v| v.to_f > 0 }
+          q.messages[:valid?] = "Price must be greater than 0"
+        end
+      end
+
+      # Build order description
+      order_desc = "#{action} #{quantity} #{symbol} #{option_type} contract(s)"
+      order_desc += " at $#{sprintf("%.2f", price)}" if price
+
+      # Confirm order
+      environment = current_session.instance_variable_get(:@is_test) ? "SANDBOX" : "PRODUCTION"
+      confirm_msg = "Submit this order? (#{environment})\n#{order_desc}"
+
+      if prompt.yes?(pastel.yellow(confirm_msg))
+        info "Order submission not yet fully implemented"
+        info "Would submit: #{order_desc}"
+        # TODO: Implement actual order submission when Order model supports options
+      end
     end
 
     def interactive_orders_menu
@@ -1699,6 +1957,175 @@ module Tastytrade
       else
         status
       end
+    end
+
+    # Display option chain in table format
+    #
+    # Shows expirations and strike counts in a formatted table.
+    #
+    # @param chain [Tastytrade::Models::OptionChain, Tastytrade::Models::NestedOptionChain] The chain to display
+    # @return [void]
+    def display_option_chain_table(chain)
+      if chain.is_a?(Tastytrade::Models::NestedOptionChain)
+        display_nested_option_chain_table(chain)
+      else
+        display_compact_option_chain_table(chain)
+      end
+    end
+
+    def display_compact_option_chain_table(chain)
+      puts "\n#{pastel.bold("Option Chain for #{chain.underlying_symbol}")}"
+      puts "Chain Type: #{chain.option_chain_type}"
+      puts "Total Expirations: #{chain.expiration_dates.size}"
+      puts
+
+      chain.expiration_dates.each do |exp_date|
+        options = chain.options_for_expiration(exp_date)
+        next if options.empty?
+
+        puts pastel.cyan("Expiration: #{exp_date}")
+
+        # Group by strike
+        strikes = {}
+        options.each do |opt|
+          strikes[opt.strike_price] ||= {}
+          strikes[opt.strike_price][opt.option_type.downcase.to_sym] = opt
+        end
+
+        # Create table
+        headers = ["Strike", "Call", "Put"]
+        rows = strikes.sort.map do |strike, opts|
+          [
+            format_price(strike),
+            opts[:call]&.symbol || "-",
+            opts[:put]&.symbol || "-"
+          ]
+        end
+
+        table = TTY::Table.new(headers, rows)
+        puts table.render(:unicode, padding: [0, 1])
+        puts
+      end
+    end
+
+    def display_nested_option_chain_table(chain)
+      puts "\n#{pastel.bold("Option Chain for #{chain.underlying_symbol}")}"
+      puts "Chain Type: #{chain.option_chain_type}"
+      puts "Total Expirations: #{chain.expirations.size}"
+      puts
+
+      chain.expirations.each do |expiration|
+        puts pastel.cyan("Expiration: #{expiration.expiration_date} (#{expiration.days_to_expiration} DTE)")
+        puts "Type: #{expiration.expiration_type}, Settlement: #{expiration.settlement_type}"
+
+        headers = ["Strike", "Call", "Call Streamer", "Put", "Put Streamer"]
+        rows = expiration.strikes.map do |strike|
+          [
+            format_price(strike.strike_price),
+            strike.call || "-",
+            strike.call_streamer_symbol || "-",
+            strike.put || "-",
+            strike.put_streamer_symbol || "-"
+          ]
+        end
+
+        # Limit display if too many strikes
+        if rows.size > 20
+          mid = rows.size / 2
+          display_rows = rows[mid - 10..mid + 9] || rows
+          puts "Showing strikes around ATM (20 of #{rows.size} total)"
+        else
+          display_rows = rows
+        end
+
+        table = TTY::Table.new(headers, display_rows)
+        puts table.render(:unicode, padding: [0, 1])
+        puts
+      end
+    end
+
+    # Display option chain in JSON format
+    #
+    # Outputs the chain data as formatted JSON.
+    #
+    # @param chain [Tastytrade::Models::OptionChain, Tastytrade::Models::NestedOptionChain] The chain to display
+    # @return [void]
+    def display_option_chain_json(chain)
+      require "json"
+
+      if chain.is_a?(Tastytrade::Models::NestedOptionChain)
+        data = {
+          underlying_symbol: chain.underlying_symbol,
+          root_symbol: chain.root_symbol,
+          option_chain_type: chain.option_chain_type,
+          shares_per_contract: chain.shares_per_contract,
+          expirations: chain.expirations.map do |exp|
+            {
+              expiration_date: exp.expiration_date,
+              days_to_expiration: exp.days_to_expiration,
+              expiration_type: exp.expiration_type,
+              settlement_type: exp.settlement_type,
+              strikes: exp.strikes.map do |strike|
+                {
+                  strike_price: strike.strike_price.to_f,
+                  call: strike.call,
+                  put: strike.put,
+                  call_streamer: strike.call_streamer_symbol,
+                  put_streamer: strike.put_streamer_symbol
+                }
+              end
+            }
+          end
+        }
+      else
+        data = {
+          underlying_symbol: chain.underlying_symbol,
+          root_symbol: chain.root_symbol,
+          option_chain_type: chain.option_chain_type,
+          shares_per_contract: chain.shares_per_contract,
+          expirations: chain.expiration_dates.map do |exp_date|
+            {
+              expiration_date: exp_date.to_s,
+              options: chain.options_for_expiration(exp_date).map do |opt|
+                {
+                  symbol: opt.symbol,
+                  option_type: opt.option_type,
+                  strike_price: opt.strike_price.to_f,
+                  expiration_date: opt.expiration_date.to_s
+                }
+              end
+            }
+          end
+        }
+      end
+
+      puts JSON.pretty_generate(data)
+    end
+
+    # Display option chain in compact format
+    #
+    # Shows a condensed view with expiration summary and option counts.
+    #
+    # @param chain [Tastytrade::Models::OptionChain, Tastytrade::Models::NestedOptionChain] The chain to display
+    # @return [void]
+    def display_option_chain_compact(chain)
+      puts "\n#{pastel.bold("Option Chain for #{chain.underlying_symbol}")}"
+
+      if chain.is_a?(Tastytrade::Models::NestedOptionChain)
+        chain.expirations.each do |exp|
+          puts "#{exp.expiration_date}: #{exp.strikes.size} strikes"
+        end
+      else
+        chain.expiration_dates.each do |exp_date|
+          options = chain.options_for_expiration(exp_date)
+          puts "#{exp_date}: #{options.size} options"
+        end
+      end
+    end
+
+    def format_price(value)
+      return "-" if value.nil?
+      value.respond_to?(:to_f) ? sprintf("%.2f", value.to_f) : value.to_s
     end
   end
 end

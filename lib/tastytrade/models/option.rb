@@ -56,6 +56,35 @@ module Tastytrade
       # @return [Array<String>] Valid exercise styles
       EXERCISE_STYLES = [AMERICAN, EUROPEAN].freeze
 
+      # Class methods for API integration
+      class << self
+        # Search for specific option contracts by symbols
+        #
+        # @param session [Tastytrade::Session] Active session
+        # @param symbols [Array<String>, String] Option symbol(s) to search for
+        # @return [Array<Option>] Array of Option objects matching the symbols
+        #
+        # @example Search for a single option
+        #   option = Option.search(session, "SPY240315C00450000").first
+        #
+        # @example Search for multiple options
+        #   options = Option.search(session, ["SPY240315C00450000", "SPY240315P00450000"])
+        def search(session, symbols)
+          symbols = Array(symbols)
+          return [] if symbols.empty?
+
+          params = { symbols: symbols.join(",") }
+          response = session.get("/instruments/options", params: params)
+
+          # API returns data.items array with option details
+          if response["data"] && response["data"]["items"]
+            response["data"]["items"].map { |item| new(item) }
+          else
+            []
+          end
+        end
+      end
+
       # Expiration types
       # @return [String] Regular (monthly) expiration type constant
       REGULAR = "Regular"

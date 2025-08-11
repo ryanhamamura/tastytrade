@@ -8,6 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Option chain retrieval from API with CLI and interactive features (#52)
+  - Fixed API integration for existing option chain models:
+    - Corrected OptionChain.get_chain to handle compact API response structure
+    - Fixed NestedOptionChain.get to parse nested API response format
+    - Updated Option.search to properly handle instrument search responses
+  - Added comprehensive CLI `option` command:
+    - View option chains with `tastytrade option --symbol SPY`
+    - Filter by days to expiration with `--dte 30`
+    - Filter by expiration type with `--expiration-type weekly|monthly|quarterly`
+    - Multiple output formats: table (default), json, compact
+    - Support for both compact and nested chain formats
+  - Interactive option chain browsing:
+    - Browse option chains from main menu
+    - Symbol entry with validation
+    - Expiration selection with DTE and type information
+    - Strike selection showing call/put symbols
+    - Option type selection (Call/Put)
+    - Option details view with buy/sell actions
+    - Arrow key navigation throughout
+  - Filter method improvements:
+    - All NestedOptionChain filter methods now return new chain objects
+    - Consistent filtering API across weekly, monthly, quarterly, and DTE filters
+  - Comprehensive documentation:
+    - CLI usage examples in README
+    - Programmatic usage examples for option chains
+    - Interactive mode instructions
 - Core Option and OptionChain models (#51)
   - Option model with comprehensive attributes:
     - Core identifiers (symbol, root_symbol, underlying_symbol, streamer_symbol)

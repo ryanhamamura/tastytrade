@@ -47,7 +47,36 @@ module Tastytrade
         def get_chain(session, symbol, **options)
           params = options.merge(symbol: symbol)
           response = session.get("/option-chains/#{symbol}/compact", params: params)
-          new(response["data"])
+
+          # The API returns data.items array with expiration groups
+          # We need to merge all items into a single chain structure
+          if response["data"] && response["data"]["items"]
+            merged_data = {
+              "underlying-symbol" => nil,
+              "root-symbol" => nil,
+              "option-chain-type" => nil,
+              "shares-per-contract" => nil,
+              "symbols" => []
+            }
+
+            response["data"]["items"].each do |item|
+              # Take metadata from first item
+              if merged_data["underlying-symbol"].nil?
+                merged_data["underlying-symbol"] = item["underlying-symbol"]
+                merged_data["root-symbol"] = item["root-symbol"]
+                merged_data["option-chain-type"] = item["option-chain-type"]
+                merged_data["shares-per-contract"] = item["shares-per-contract"]
+              end
+
+              # Collect all symbols
+              merged_data["symbols"] ||= []
+              merged_data["symbols"].concat(item["symbols"] || [])
+            end
+
+            new(merged_data)
+          else
+            new(response["data"] || {})
+          end
         end
       end
 
@@ -286,23 +315,67 @@ module Tastytrade
         @expirations = {}
 
         # Handle different possible response formats
-        items = @data["items"] || @data["options"] || []
 
-        if items.is_a?(Array)
-          # Flat array of options - group by expiration
-          items.each do |option_data|
-            option = Option.new(option_data)
-            exp_date = option.expiration_date
-            next unless exp_date
+        # For compact chain format with just symbols
+        if @data["symbols"].is_a?(Array) && !@data["symbols"].empty?
+          # Parse symbols to create minimal Option objects
+          @data["symbols"].each do |symbol|
+            next unless symbol.is_a?(String)
 
-            @expirations[exp_date] ||= []
-            @expirations[exp_date] << option
+            # Parse the OCC symbol format: SPY   250811C00400000
+            # Format: ROOT YYMMDD[C/P]SSSSSCCC
+            if symbol =~ /^(\S+)\s+(\d{6})([CP])(\d{8})$/
+              root = $1
+              date_str = $2
+              option_type = $3 == "C" ? "Call" : "Put"
+              strike_str = $4
+
+              # Parse date (YYMMDD format)
+              year = "20" + date_str[0..1]
+              month = date_str[2..3]
+              day = date_str[4..5]
+              exp_date = Date.parse("#{year}-#{month}-#{day}") rescue nil
+
+              # Parse strike (format: SSSSSCCC where last 3 are decimals)
+              strike_price = (strike_str.to_i / 1000.0).to_s
+
+              if exp_date
+                # Create minimal option data
+                option_data = {
+                  "symbol" => symbol.strip,
+                  "root-symbol" => root,
+                  "underlying-symbol" => @underlying_symbol,
+                  "option-type" => option_type,
+                  "expiration-date" => exp_date.to_s,
+                  "strike-price" => strike_price
+                }
+
+                option = Option.new(option_data)
+                @expirations[exp_date] ||= []
+                @expirations[exp_date] << option
+              end
+            end
           end
-        elsif items.is_a?(Hash)
-          # Already grouped by expiration
-          items.each do |exp_str, options_array|
-            exp_date = Date.parse(exp_str.to_s)
-            @expirations[exp_date] = options_array.map { |opt_data| Option.new(opt_data) }
+        else
+          # Original logic for full option data
+          items = @data["items"] || @data["options"] || []
+
+          if items.is_a?(Array)
+            # Flat array of options - group by expiration
+            items.each do |option_data|
+              option = Option.new(option_data)
+              exp_date = option.expiration_date
+              next unless exp_date
+
+              @expirations[exp_date] ||= []
+              @expirations[exp_date] << option
+            end
+          elsif items.is_a?(Hash)
+            # Already grouped by expiration
+            items.each do |exp_str, options_array|
+              exp_date = Date.parse(exp_str.to_s)
+              @expirations[exp_date] = options_array.map { |opt_data| Option.new(opt_data) }
+            end
           end
         end
 
