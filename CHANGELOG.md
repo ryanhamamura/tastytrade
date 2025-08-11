@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Advanced option strategies: Iron Butterfly, Butterfly Spreads, Calendar Spreads, and Diagonal Spreads (#62)
+  - New OptionOrderBuilder methods:
+    - `iron_butterfly` - 4-leg neutral strategy with ATM short straddle + OTM long strangle
+    - `butterfly_spread` - 3-leg strategy with 1-2-1 quantity ratios
+    - `calendar_spread` - 2-leg time spread with same strike, different expirations
+    - `diagonal_spread` - 2-leg strategy with different strikes AND expirations
+  - New CLI commands with comprehensive options:
+    - `option iron_butterfly` - Create iron butterfly positions
+    - `option butterfly` - Create call or put butterfly spreads
+    - `option calendar` - Create calendar spreads with DTE targeting
+    - `option diagonal` - Create diagonal spreads with flexible strike/expiration
+  - Comprehensive validation for each strategy:
+    - Iron Butterfly: center strike equality, equal wing widths
+    - Butterfly: equidistant strikes, 1-2-1 quantity validation
+    - Calendar: same strike requirement, expiration ordering
+    - Diagonal: different strikes AND expirations required
+  - Intelligent defaults:
+    - ATM strike selection when not specified
+    - 30/60 DTE defaults for calendar/diagonal spreads
+    - 10 point wing width defaults for butterflies
+  - Full test coverage with 37+ unit tests
+  - Test scripts updated with new strategies
+  - Security improvements: masked account numbers and removed email display in test output
 - Option order placement and multi-leg strategies (#54, #56, #57, #58, #59)
   - Complete CLI commands for options trading:
     - `option chain` - Display option chains with filters

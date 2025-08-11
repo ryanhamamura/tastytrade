@@ -51,6 +51,17 @@ test_command "Vertical spread" "bundle exec exe/tastytrade option spread SPY --t
 test_command "Strangle" "bundle exec exe/tastytrade option strangle SPY --test --call-strike 625 --put-strike 615 --expiration 2025-08-11 --dry-run"
 test_command "Straddle" "bundle exec exe/tastytrade option straddle SPY --test --strike 620 --expiration 2025-08-11 --dry-run"
 
+# Test advanced strategies (NEW)
+echo -e "\n6. Testing advanced strategies (dry-run)"
+test_command "Iron Butterfly" "bundle exec exe/tastytrade option iron_butterfly SPY --test --center-strike 620 --wing-width 10 --expiration 2025-08-11 --dry-run"
+test_command "Call Butterfly" "bundle exec exe/tastytrade option butterfly SPY --test --type call --center-strike 620 --wing-width 10 --expiration 2025-08-11 --dry-run"
+test_command "Put Butterfly" "bundle exec exe/tastytrade option butterfly SPY --test --type put --center-strike 620 --wing-width 10 --expiration 2025-08-11 --dry-run"
+test_command "Call Calendar" "bundle exec exe/tastytrade option calendar SPY --test --type call --strike 620 --short-dte 30 --long-dte 60 --dry-run"
+test_command "Put Calendar" "bundle exec exe/tastytrade option calendar SPY --test --type put --strike 620 --short-dte 30 --long-dte 60 --dry-run"
+test_command "Call Diagonal" "bundle exec exe/tastytrade option diagonal SPY --test --type call --short-strike 620 --long-strike 625 --short-dte 30 --long-dte 60 --dry-run"
+test_command "Put Diagonal" "bundle exec exe/tastytrade option diagonal SPY --test --type put --short-strike 620 --long-strike 615 --short-dte 30 --long-dte 60 --dry-run"
+
 echo -e "\n============================================================"
 echo "Testing Complete!"
+echo "All strategies including advanced ones tested!"
 echo "============================================================"

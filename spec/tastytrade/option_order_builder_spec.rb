@@ -498,4 +498,365 @@ RSpec.describe Tastytrade::OptionOrderBuilder do
       expect(net_premium).to eq(BigDecimal("100"))
     end
   end
+
+  describe "advanced strategies" do
+    describe "#iron_butterfly" do
+      let(:short_call_ib) do
+        instance_double(
+          Tastytrade::Models::Option,
+          symbol: "AAPL 240119C00150000",
+          option_type: "C",
+          strike_price: BigDecimal("150"),
+          expiration_date: Date.new(2024, 1, 19),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+      end
+
+      let(:long_call_ib) do
+        instance_double(
+          Tastytrade::Models::Option,
+          symbol: "AAPL 240119C00160000",
+          option_type: "C",
+          strike_price: BigDecimal("160"),
+          expiration_date: Date.new(2024, 1, 19),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+      end
+
+      let(:short_put_ib) do
+        instance_double(
+          Tastytrade::Models::Option,
+          symbol: "AAPL 240119P00150000",
+          option_type: "P",
+          strike_price: BigDecimal("150"),
+          expiration_date: Date.new(2024, 1, 19),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+      end
+
+      let(:long_put_ib) do
+        instance_double(
+          Tastytrade::Models::Option,
+          symbol: "AAPL 240119P00140000",
+          option_type: "P",
+          strike_price: BigDecimal("140"),
+          expiration_date: Date.new(2024, 1, 19),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+      end
+
+      it "creates an iron butterfly with 4 legs" do
+        order = builder.iron_butterfly(
+          short_call_ib, long_call_ib, short_put_ib, long_put_ib, 1,
+          price: BigDecimal("3.00")
+        )
+
+        expect(order).to be_a(Tastytrade::Order)
+        expect(order.type).to eq(Tastytrade::OrderType::LIMIT)
+        expect(order.price).to eq(BigDecimal("3.00"))
+        expect(order.legs.size).to eq(4)
+
+        expect(order.legs[0].action).to eq(Tastytrade::OrderAction::SELL_TO_OPEN)
+        expect(order.legs[0].symbol).to eq("AAPL 240119C00150000")
+
+        expect(order.legs[1].action).to eq(Tastytrade::OrderAction::BUY_TO_OPEN)
+        expect(order.legs[1].symbol).to eq("AAPL 240119C00160000")
+
+        expect(order.legs[2].action).to eq(Tastytrade::OrderAction::SELL_TO_OPEN)
+        expect(order.legs[2].symbol).to eq("AAPL 240119P00150000")
+
+        expect(order.legs[3].action).to eq(Tastytrade::OrderAction::BUY_TO_OPEN)
+        expect(order.legs[3].symbol).to eq("AAPL 240119P00140000")
+      end
+
+      it "validates center strike requirement" do
+        different_strike_put = instance_double(
+          Tastytrade::Models::Option,
+          option_type: "P",
+          strike_price: BigDecimal("155"),
+          expiration_date: Date.new(2024, 1, 19),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+
+        expect {
+          builder.iron_butterfly(short_call_ib, long_call_ib, different_strike_put, long_put_ib, 1)
+        }.to raise_error(Tastytrade::OptionOrderBuilder::InvalidStrategyError, /same strike price/)
+      end
+
+      it "validates equal wing widths" do
+        unequal_call = instance_double(
+          Tastytrade::Models::Option,
+          option_type: "C",
+          strike_price: BigDecimal("165"),
+          expiration_date: Date.new(2024, 1, 19),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+
+        expect {
+          builder.iron_butterfly(short_call_ib, unequal_call, short_put_ib, long_put_ib, 1)
+        }.to raise_error(Tastytrade::OptionOrderBuilder::InvalidStrategyError, /Wing widths must be equal/)
+      end
+    end
+
+    describe "#butterfly_spread" do
+      let(:long_low_bf) do
+        instance_double(
+          Tastytrade::Models::Option,
+          symbol: "AAPL 240119C00140000",
+          option_type: "C",
+          strike_price: BigDecimal("140"),
+          expiration_date: Date.new(2024, 1, 19),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+      end
+
+      let(:short_middle_bf) do
+        instance_double(
+          Tastytrade::Models::Option,
+          symbol: "AAPL 240119C00150000",
+          option_type: "C",
+          strike_price: BigDecimal("150"),
+          expiration_date: Date.new(2024, 1, 19),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+      end
+
+      let(:long_high_bf) do
+        instance_double(
+          Tastytrade::Models::Option,
+          symbol: "AAPL 240119C00160000",
+          option_type: "C",
+          strike_price: BigDecimal("160"),
+          expiration_date: Date.new(2024, 1, 19),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+      end
+
+      it "creates a butterfly spread with correct quantities" do
+        order = builder.butterfly_spread(
+          long_low_bf, short_middle_bf, long_high_bf, 1,
+          price: BigDecimal("1.50")
+        )
+
+        expect(order).to be_a(Tastytrade::Order)
+        expect(order.type).to eq(Tastytrade::OrderType::LIMIT)
+        expect(order.price).to eq(BigDecimal("1.50"))
+        expect(order.legs.size).to eq(3)
+
+        expect(order.legs[0].action).to eq(Tastytrade::OrderAction::BUY_TO_OPEN)
+        expect(order.legs[0].symbol).to eq("AAPL 240119C00140000")
+        expect(order.legs[0].quantity).to eq(1)
+
+        expect(order.legs[1].action).to eq(Tastytrade::OrderAction::SELL_TO_OPEN)
+        expect(order.legs[1].symbol).to eq("AAPL 240119C00150000")
+        expect(order.legs[1].quantity).to eq(2)
+
+        expect(order.legs[2].action).to eq(Tastytrade::OrderAction::BUY_TO_OPEN)
+        expect(order.legs[2].symbol).to eq("AAPL 240119C00160000")
+        expect(order.legs[2].quantity).to eq(1)
+      end
+
+      it "validates equidistant wings" do
+        unequal_high = instance_double(
+          Tastytrade::Models::Option,
+          option_type: "C",
+          strike_price: BigDecimal("165"),
+          expiration_date: Date.new(2024, 1, 19),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+
+        expect {
+          builder.butterfly_spread(long_low_bf, short_middle_bf, unequal_high, 1)
+        }.to raise_error(Tastytrade::OptionOrderBuilder::InvalidStrategyError, /Wings must be equidistant/)
+      end
+
+      it "validates same option types" do
+        put_middle = instance_double(
+          Tastytrade::Models::Option,
+          option_type: "P",
+          strike_price: BigDecimal("150"),
+          expiration_date: Date.new(2024, 1, 19),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+
+        expect {
+          builder.butterfly_spread(long_low_bf, put_middle, long_high_bf, 1)
+        }.to raise_error(Tastytrade::OptionOrderBuilder::InvalidStrategyError, /All options must be same type/)
+      end
+    end
+
+    describe "#calendar_spread" do
+      let(:short_calendar) do
+        instance_double(
+          Tastytrade::Models::Option,
+          symbol: "AAPL 240119C00150000",
+          option_type: "C",
+          strike_price: BigDecimal("150"),
+          expiration_date: Date.new(2024, 1, 19),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+      end
+
+      let(:long_calendar) do
+        instance_double(
+          Tastytrade::Models::Option,
+          symbol: "AAPL 240216C00150000",
+          option_type: "C",
+          strike_price: BigDecimal("150"),
+          expiration_date: Date.new(2024, 2, 16),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+      end
+
+      it "creates a calendar spread" do
+        order = builder.calendar_spread(
+          short_calendar, long_calendar, 1,
+          price: BigDecimal("1.00")
+        )
+
+        expect(order).to be_a(Tastytrade::Order)
+        expect(order.type).to eq(Tastytrade::OrderType::LIMIT)
+        expect(order.price).to eq(BigDecimal("1.00"))
+        expect(order.legs.size).to eq(2)
+
+        expect(order.legs[0].action).to eq(Tastytrade::OrderAction::SELL_TO_OPEN)
+        expect(order.legs[0].symbol).to eq("AAPL 240119C00150000")
+
+        expect(order.legs[1].action).to eq(Tastytrade::OrderAction::BUY_TO_OPEN)
+        expect(order.legs[1].symbol).to eq("AAPL 240216C00150000")
+      end
+
+      it "validates different expiration dates" do
+        same_exp = instance_double(
+          Tastytrade::Models::Option,
+          option_type: "C",
+          strike_price: BigDecimal("150"),
+          expiration_date: Date.new(2024, 1, 19),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+
+        expect {
+          builder.calendar_spread(short_calendar, same_exp, 1)
+        }.to raise_error(Tastytrade::OptionOrderBuilder::InvalidStrategyError, /different expiration dates/)
+      end
+
+      it "validates same strike prices" do
+        different_strike = instance_double(
+          Tastytrade::Models::Option,
+          option_type: "C",
+          strike_price: BigDecimal("155"),
+          expiration_date: Date.new(2024, 2, 16),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+
+        expect {
+          builder.calendar_spread(short_calendar, different_strike, 1)
+        }.to raise_error(Tastytrade::OptionOrderBuilder::InvalidStrategyError, /same strike price/)
+      end
+
+      it "validates expiration order" do
+        earlier_exp = instance_double(
+          Tastytrade::Models::Option,
+          option_type: "C",
+          strike_price: BigDecimal("150"),
+          expiration_date: Date.new(2024, 1, 5),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+
+        expect {
+          builder.calendar_spread(short_calendar, earlier_exp, 1)
+        }.to raise_error(Tastytrade::OptionOrderBuilder::InvalidStrategyError, /Short option must expire before/)
+      end
+    end
+
+    describe "#diagonal_spread" do
+      let(:short_diagonal) do
+        instance_double(
+          Tastytrade::Models::Option,
+          symbol: "AAPL 240119C00150000",
+          option_type: "C",
+          strike_price: BigDecimal("150"),
+          expiration_date: Date.new(2024, 1, 19),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+      end
+
+      let(:long_diagonal) do
+        instance_double(
+          Tastytrade::Models::Option,
+          symbol: "AAPL 240216C00155000",
+          option_type: "C",
+          strike_price: BigDecimal("155"),
+          expiration_date: Date.new(2024, 2, 16),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+      end
+
+      it "creates a diagonal spread" do
+        order = builder.diagonal_spread(
+          short_diagonal, long_diagonal, 1,
+          price: BigDecimal("2.00")
+        )
+
+        expect(order).to be_a(Tastytrade::Order)
+        expect(order.type).to eq(Tastytrade::OrderType::LIMIT)
+        expect(order.price).to eq(BigDecimal("2.00"))
+        expect(order.legs.size).to eq(2)
+
+        expect(order.legs[0].action).to eq(Tastytrade::OrderAction::SELL_TO_OPEN)
+        expect(order.legs[0].symbol).to eq("AAPL 240119C00150000")
+
+        expect(order.legs[1].action).to eq(Tastytrade::OrderAction::BUY_TO_OPEN)
+        expect(order.legs[1].symbol).to eq("AAPL 240216C00155000")
+      end
+
+      it "validates different strike prices" do
+        same_strike = instance_double(
+          Tastytrade::Models::Option,
+          option_type: "C",
+          strike_price: BigDecimal("150"),
+          expiration_date: Date.new(2024, 2, 16),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+
+        expect {
+          builder.diagonal_spread(short_diagonal, same_strike, 1)
+        }.to raise_error(Tastytrade::OptionOrderBuilder::InvalidStrategyError, /different strike prices/)
+      end
+
+      it "validates different expiration dates" do
+        same_exp = instance_double(
+          Tastytrade::Models::Option,
+          option_type: "C",
+          strike_price: BigDecimal("155"),
+          expiration_date: Date.new(2024, 1, 19),
+          underlying_symbol: "AAPL",
+          expired?: false
+        )
+
+        expect {
+          builder.diagonal_spread(short_diagonal, same_exp, 1)
+        }.to raise_error(Tastytrade::OptionOrderBuilder::InvalidStrategyError, /different expiration dates/)
+      end
+    end
+  end
 end
