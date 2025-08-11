@@ -32,24 +32,33 @@ module Tastytrade
 
   # Represents a single leg of an order
   class OrderLeg
-    attr_reader :action, :symbol, :quantity, :instrument_type
+    attr_reader :action, :symbol, :quantity, :instrument_type, :position_effect
 
-    def initialize(action:, symbol:, quantity:, instrument_type: "Equity")
+    OCC_SYMBOL_PATTERN = /\A[A-Z0-9]+\s\d{6}[CP]\d{8}\z/
+
+    def initialize(action:, symbol:, quantity:, instrument_type: "Equity", position_effect: nil)
       validate_action!(action)
+      validate_symbol!(symbol, instrument_type)
+      validate_position_effect!(position_effect) if position_effect
 
       @action = action
       @symbol = symbol
       @quantity = quantity.to_i
       @instrument_type = instrument_type
+      @position_effect = position_effect || auto_detect_position_effect(action)
     end
 
     def to_api_params
-      {
+      params = {
         "action" => @action,
         "symbol" => @symbol,
         "quantity" => @quantity,
         "instrument-type" => @instrument_type
       }
+
+      params["position-effect"] = @position_effect if @position_effect && @instrument_type == "Option"
+
+      params
     end
 
     private
@@ -64,6 +73,32 @@ module Tastytrade
 
       unless valid_actions.include?(action)
         raise ArgumentError, "Invalid action: #{action}. Must be one of: #{valid_actions.join(", ")}"
+      end
+    end
+
+    def validate_symbol!(symbol, instrument_type)
+      return unless instrument_type == "Option"
+
+      unless symbol.match?(OCC_SYMBOL_PATTERN)
+        raise ArgumentError, "Invalid OCC option symbol format: #{symbol}. Expected format: 'AAPL 240119C00150000'"
+      end
+    end
+
+    def validate_position_effect!(position_effect)
+      valid_effects = ["Opening", "Closing", "Auto"]
+      unless valid_effects.include?(position_effect)
+        raise ArgumentError, "Invalid position effect: #{position_effect}. Must be one of: #{valid_effects.join(", ")}"
+      end
+    end
+
+    def auto_detect_position_effect(action)
+      case action
+      when OrderAction::BUY_TO_OPEN, OrderAction::SELL_TO_OPEN
+        "Opening"
+      when OrderAction::BUY_TO_CLOSE, OrderAction::SELL_TO_CLOSE
+        "Closing"
+      else
+        "Auto"
       end
     end
   end

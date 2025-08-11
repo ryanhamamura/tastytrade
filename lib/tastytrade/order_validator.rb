@@ -63,10 +63,10 @@ module Tastytrade
 
       # Run all validations
       validate_order_structure!
+      validate_account_permissions!  # Check permissions before trying to fetch symbols
       validate_symbols!
       validate_quantities!
       validate_prices!
-      validate_account_permissions!
       validate_market_hours!
       validate_buying_power! unless skip_dry_run
 
@@ -141,8 +141,7 @@ module Tastytrade
       when "Equity"
         validate_equity_symbol!(symbol)
       when "Option"
-        # TODO: Implement option symbol validation
-        @warnings << "Option symbol validation not yet implemented for #{symbol}"
+        validate_option_symbol!(symbol)
       when "Future"
         # TODO: Implement futures symbol validation
         @warnings << "Futures symbol validation not yet implemented for #{symbol}"
@@ -157,6 +156,44 @@ module Tastytrade
       Instruments::Equity.get(@session, symbol)
     rescue StandardError => e
       @errors << "Invalid equity symbol '#{symbol}': #{e.message}"
+    end
+
+    # Validate option symbol and its properties
+    def validate_option_symbol!(symbol)
+      # Parse OCC symbol format: AAPL 240119C00150000
+      unless symbol.match?(/\A[A-Z0-9]+\s\d{6}[CP]\d{8}\z/)
+        @errors << "Invalid option symbol format '#{symbol}'. Expected OCC format like 'AAPL 240119C00150000'"
+        return
+      end
+
+      # Skip fetching if we already have permission errors
+      return if @errors.any? { |e| e.include?("options trading permissions") }
+
+      # Try to fetch the option to validate it exists
+      option = Models::Option.get(@session, symbol)
+
+      # Check if option is expired
+      if option.expired?
+        @errors << "Option '#{symbol}' has expired on #{option.expiration_date}"
+      end
+
+      # Check for 0 DTE options (warn but don't error)
+      if option.days_to_expiration == 0
+        @warnings << "Option '#{symbol}' expires today (0 DTE)"
+      end
+
+      # Validate strike price is reasonable
+      validate_option_strike!(option)
+
+    rescue StandardError => e
+      @errors << "Invalid option symbol '#{symbol}': #{e.message}"
+    end
+
+    # Validate option strike price is reasonable
+    def validate_option_strike!(option)
+      # Skip validation if we don't have pricing information
+      # This would normally check against current market price
+      # For now, we'll skip this validation
     end
 
     # Validate order quantities

@@ -214,12 +214,13 @@ module Tastytrade
 
       desc "place", "Place a new order"
       option :account, type: :string, desc: "Account number (uses default if not specified)"
-      option :symbol, type: :string, required: true, desc: "Symbol to trade (e.g., AAPL, SPY)"
+      option :symbol, type: :string, required: true, desc: "Symbol to trade (e.g., AAPL, SPY, or OCC option symbol)"
       option :action, type: :string, required: true, desc: "Order action (buy_to_open, sell_to_close, etc.)"
-      option :quantity, type: :numeric, required: true, desc: "Number of shares"
+      option :quantity, type: :numeric, required: true, desc: "Number of shares or contracts"
       option :type, type: :string, default: "limit", desc: "Order type (market, limit)"
       option :price, type: :numeric, desc: "Limit price (required for limit orders)"
       option :time_in_force, type: :string, default: "day", desc: "Order duration (day, gtc)"
+      option :instrument_type, type: :string, default: "equity", desc: "Instrument type (equity, option)"
       option :dry_run, type: :boolean, default: false, desc: "Perform validation only without placing the order"
       option :skip_confirmation, type: :boolean, default: false, desc: "Skip confirmation prompt"
       def place
@@ -281,11 +282,36 @@ module Tastytrade
                           exit 1
         end
 
+        # Determine instrument type
+        instrument_type = if options[:instrument_type]
+          case options[:instrument_type].downcase
+          when "option", "opt"
+            "Option"
+          when "equity", "stock", "eq"
+            "Equity"
+          else
+            # Auto-detect based on symbol format
+            if options[:symbol].match?(/\A[A-Z0-9]+\s\d{6}[CP]\d{8}\z/)
+              "Option"
+            else
+              "Equity"
+            end
+          end
+        else
+                            # Auto-detect based on symbol format if not specified
+          if options[:symbol].match?(/\A[A-Z0-9]+\s\d{6}[CP]\d{8}\z/)
+            "Option"
+          else
+            "Equity"
+          end
+        end
+
         # Create the order
         leg = Tastytrade::OrderLeg.new(
           action: action,
           symbol: options[:symbol].upcase,
-          quantity: options[:quantity].to_i
+          quantity: options[:quantity].to_i,
+          instrument_type: instrument_type
         )
 
         order = Tastytrade::Order.new(
@@ -300,8 +326,9 @@ module Tastytrade
         puts "Order Summary:"
         puts "  Account: #{account.account_number}"
         puts "  Symbol: #{options[:symbol].upcase}"
+        puts "  Instrument: #{instrument_type}"
         puts "  Action: #{action}"
-        puts "  Quantity: #{options[:quantity]}"
+        puts "  Quantity: #{options[:quantity]} #{instrument_type == "Option" ? "contract(s)" : "share(s)"}"
         puts "  Type: #{order_type}"
         puts "  Time in Force: #{time_in_force}"
         puts "  Price: #{options[:price] ? format_currency(options[:price]) : "Market"}"
@@ -388,6 +415,123 @@ module Tastytrade
         rescue Tastytrade::MarketClosedError => e
           error "Market closed: #{e.message}"
           exit 1
+        rescue Tastytrade::Error => e
+          error "Failed to place order: #{e.message}"
+          exit 1
+        end
+      end
+
+      desc "option_spread", "Place a multi-leg option spread order"
+      option :account, type: :string, desc: "Account number (uses default if not specified)"
+      option :strategy, type: :string, required: true, desc: "Strategy type (vertical, iron_condor, strangle, straddle)"
+      option :symbol, type: :string, required: true, desc: "Underlying symbol (e.g., AAPL, SPY)"
+      option :expiration, type: :string, required: true, desc: "Expiration date (YYYY-MM-DD)"
+      option :quantity, type: :numeric, default: 1, desc: "Number of contracts"
+      option :price, type: :numeric, desc: "Net debit/credit for the spread"
+      option :dry_run, type: :boolean, default: false, desc: "Perform validation only"
+      option :skip_confirmation, type: :boolean, default: false, desc: "Skip confirmation prompt"
+      # Strategy-specific options
+      option :long_strike, type: :numeric, desc: "Long strike price (for vertical spreads)"
+      option :short_strike, type: :numeric, desc: "Short strike price (for vertical spreads)"
+      option :put_strike, type: :numeric, desc: "Put strike price (for strangles)"
+      option :call_strike, type: :numeric, desc: "Call strike price (for strangles)"
+      option :strike, type: :numeric, desc: "Strike price (for straddles)"
+      option :put_short, type: :numeric, desc: "Short put strike (for iron condors)"
+      option :put_long, type: :numeric, desc: "Long put strike (for iron condors)"
+      option :call_short, type: :numeric, desc: "Short call strike (for iron condors)"
+      option :call_long, type: :numeric, desc: "Long call strike (for iron condors)"
+      option :call_or_put, type: :string, desc: "Option type for vertical spreads (call/put)"
+      option :action, type: :string, default: "buy", desc: "Buy or sell the spread/strategy"
+      def option_spread
+        require_authentication!
+        require "tastytrade/option_order_builder"
+
+        account = if options[:account]
+          Tastytrade::Models::Account.get(current_session, options[:account])
+        else
+          current_account || select_account_interactively
+        end
+
+        return unless account
+
+        builder = Tastytrade::OptionOrderBuilder.new(current_session, account)
+
+        # Parse expiration date
+        expiration = Date.parse(options[:expiration])
+
+        # Build OCC symbols based on strategy
+        order = case options[:strategy].downcase
+                when "vertical"
+                  create_vertical_spread(builder, expiration)
+                when "iron_condor", "condor"
+                  create_iron_condor(builder, expiration)
+                when "strangle"
+                  create_strangle(builder, expiration)
+                when "straddle"
+                  create_straddle(builder, expiration)
+                else
+                  error "Invalid strategy. Must be: vertical, iron_condor, strangle, or straddle"
+          exit 1
+        end
+
+        # Display order summary
+        display_option_order_summary(order, options[:strategy])
+
+        # Perform validation
+        info "Validating order..."
+        begin
+          validator = Tastytrade::OrderValidator.new(current_session, account, order)
+          dry_run_response = validator.dry_run_validate!
+
+          if dry_run_response && dry_run_response.buying_power_effect
+            effect = dry_run_response.buying_power_effect
+            puts "Buying Power Impact:"
+            puts "  Current BP: #{format_currency(effect.current_buying_power)}"
+            puts "  Order Impact: #{format_currency(effect.buying_power_change_amount)}"
+            puts "  New BP: #{format_currency(effect.new_buying_power)}"
+            puts ""
+          end
+
+          if validator.warnings.any?
+            puts "Warnings:"
+            validator.warnings.each { |w| warning "  - #{w}" }
+            puts ""
+          end
+
+          if validator.errors.any?
+            error "Validation failed:"
+            validator.errors.each { |e| error "  - #{e}" }
+            exit 1
+          end
+        rescue Tastytrade::OrderValidationError => e
+          error "Order validation failed:"
+          e.errors.each { |err| error "  - #{err}" }
+          exit 1
+        end
+
+        # If dry-run only, stop here
+        if options[:dry_run]
+          success "Dry-run validation passed! Order is valid but was not placed."
+          return
+        end
+
+        # Confirmation prompt
+        unless options[:skip_confirmation]
+          unless prompt.yes?("Place this order?")
+            info "Order cancelled by user"
+            return
+          end
+        end
+
+        # Place the order
+        info "Placing order..."
+        begin
+          response = account.place_order(current_session, order, skip_validation: true)
+          success "Order placed successfully!"
+          puts ""
+          puts "Order Details:"
+          puts "  Order ID: #{response.order_id}"
+          puts "  Status: #{response.status}"
         rescue Tastytrade::Error => e
           error "Failed to place order: #{e.message}"
           exit 1
@@ -545,6 +689,144 @@ module Tastytrade
       end
 
       private
+
+      def create_vertical_spread(builder, expiration)
+        unless options[:long_strike] && options[:short_strike]
+          error "Vertical spread requires --long-strike and --short-strike"
+          exit 1
+        end
+
+        option_type = (options[:call_or_put] || "call").downcase == "put" ? "P" : "C"
+
+        # Build OCC symbols
+        long_symbol = build_occ_symbol(options[:symbol], expiration, option_type, options[:long_strike])
+        short_symbol = build_occ_symbol(options[:symbol], expiration, option_type, options[:short_strike])
+
+        # Get option contracts
+        long_option = Tastytrade::Models::Option.get(current_session, long_symbol)
+        short_option = Tastytrade::Models::Option.get(current_session, short_symbol)
+
+        # Create the spread
+        builder.vertical_spread(
+          long_option,
+          short_option,
+          options[:quantity] || 1,
+          price: options[:price] ? BigDecimal(options[:price].to_s) : nil
+        )
+      end
+
+      def create_iron_condor(builder, expiration)
+        unless options[:put_short] && options[:put_long] && options[:call_short] && options[:call_long]
+          error "Iron condor requires --put-short, --put-long, --call-short, and --call-long"
+          exit 1
+        end
+
+        # Build OCC symbols for all four legs
+        put_short_symbol = build_occ_symbol(options[:symbol], expiration, "P", options[:put_short])
+        put_long_symbol = build_occ_symbol(options[:symbol], expiration, "P", options[:put_long])
+        call_short_symbol = build_occ_symbol(options[:symbol], expiration, "C", options[:call_short])
+        call_long_symbol = build_occ_symbol(options[:symbol], expiration, "C", options[:call_long])
+
+        # Get option contracts
+        put_short = Tastytrade::Models::Option.get(current_session, put_short_symbol)
+        put_long = Tastytrade::Models::Option.get(current_session, put_long_symbol)
+        call_short = Tastytrade::Models::Option.get(current_session, call_short_symbol)
+        call_long = Tastytrade::Models::Option.get(current_session, call_long_symbol)
+
+        # Create the iron condor
+        builder.iron_condor(
+          put_short,
+          put_long,
+          call_short,
+          call_long,
+          options[:quantity] || 1,
+          price: options[:price] ? BigDecimal(options[:price].to_s) : nil
+        )
+      end
+
+      def create_strangle(builder, expiration)
+        unless options[:put_strike] && options[:call_strike]
+          error "Strangle requires --put-strike and --call-strike"
+          exit 1
+        end
+
+        # Build OCC symbols
+        put_symbol = build_occ_symbol(options[:symbol], expiration, "P", options[:put_strike])
+        call_symbol = build_occ_symbol(options[:symbol], expiration, "C", options[:call_strike])
+
+        # Get option contracts
+        put_option = Tastytrade::Models::Option.get(current_session, put_symbol)
+        call_option = Tastytrade::Models::Option.get(current_session, call_symbol)
+
+        # Determine action (buy or sell)
+        action = options[:action].downcase == "sell" ?
+          Tastytrade::OrderAction::SELL_TO_OPEN :
+          Tastytrade::OrderAction::BUY_TO_OPEN
+
+        # Create the strangle
+        builder.strangle(
+          put_option,
+          call_option,
+          options[:quantity] || 1,
+          action: action,
+          price: options[:price] ? BigDecimal(options[:price].to_s) : nil
+        )
+      end
+
+      def create_straddle(builder, expiration)
+        unless options[:strike]
+          error "Straddle requires --strike"
+          exit 1
+        end
+
+        # Determine action (buy or sell)
+        action = options[:action].downcase == "sell" ?
+          Tastytrade::OrderAction::SELL_TO_OPEN :
+          Tastytrade::OrderAction::BUY_TO_OPEN
+
+        # Create the straddle
+        option_strike = { symbol: options[:symbol], strike: options[:strike] }
+
+        builder.straddle(
+          option_strike,
+          expiration,
+          options[:quantity] || 1,
+          action: action,
+          price: options[:price] ? BigDecimal(options[:price].to_s) : nil
+        )
+      end
+
+      def build_occ_symbol(underlying, expiration, option_type, strike)
+        exp_str = expiration.strftime("%y%m%d")
+        strike_str = format("%08d", (strike * 1000).to_i)
+        "#{underlying.upcase} #{exp_str}#{option_type}#{strike_str}"
+      end
+
+      def display_option_order_summary(order, strategy)
+        puts ""
+        puts "Option Order Summary:"
+        puts "  Strategy: #{strategy.capitalize}"
+        puts "  Type: #{order.type}"
+        puts "  Time in Force: #{order.time_in_force}"
+        puts "  Price: #{order.price ? format_currency(order.price) : "Market"}"
+        puts ""
+        puts "Legs:"
+        order.legs.each_with_index do |leg, i|
+          puts "  #{i + 1}. #{leg.action} #{leg.quantity} x #{leg.symbol}"
+        end
+        puts ""
+
+        # Calculate and display net premium if builder is available
+        if defined?(builder) && builder
+          net_premium = builder.calculate_net_premium(order)
+          if net_premium < 0
+            puts "Net Debit: #{format_currency(net_premium.abs)}"
+          else
+            puts "Net Credit: #{format_currency(net_premium)}"
+          end
+          puts ""
+        end
+      end
 
       def display_order_details(order)
         puts ""
