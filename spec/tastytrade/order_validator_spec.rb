@@ -156,10 +156,42 @@ RSpec.describe Tastytrade::OrderValidator do
       let(:option_leg) do
         instance_double(
           Tastytrade::OrderLeg,
-          symbol: "AAPL 240119C150",
+          symbol: "AAPL 240119C00150000",
           quantity: 1,
           action: Tastytrade::OrderAction::BUY_TO_OPEN,
           instrument_type: "Option"
+        )
+      end
+
+      let(:valid_option) do
+        instance_double(
+          Tastytrade::Models::Option,
+          symbol: "AAPL 240119C00150000",
+          expiration_date: Date.new(2024, 1, 19),
+          expired?: false,
+          days_to_expiration: 30,
+          strike_price: BigDecimal("150")
+        )
+      end
+
+      let(:expired_option) do
+        instance_double(
+          Tastytrade::Models::Option,
+          symbol: "AAPL 231231C00150000",
+          expiration_date: Date.new(2023, 12, 31),
+          expired?: true,
+          days_to_expiration: -10
+        )
+      end
+
+      let(:zero_dte_option) do
+        instance_double(
+          Tastytrade::Models::Option,
+          symbol: "AAPL 240119C00150000",
+          expiration_date: Date.today,
+          expired?: false,
+          days_to_expiration: 0,
+          strike_price: BigDecimal("150")
         )
       end
 
@@ -183,9 +215,101 @@ RSpec.describe Tastytrade::OrderValidator do
           allow(trading_status).to receive(:can_trade_options?).and_return(true)
         end
 
-        it "adds warning about option validation not implemented" do
-          validator.validate!(skip_dry_run: true)
-          expect(validator.warnings).to include(/Option symbol validation not yet implemented/)
+        context "with valid option symbol" do
+          before do
+            allow(Tastytrade::Models::Option).to receive(:get).with(session,
+"AAPL 240119C00150000").and_return(valid_option)
+          end
+
+          it "validates without errors" do
+            validator.validate!(skip_dry_run: true)
+            expect(validator.errors).to be_empty
+          end
+        end
+
+        context "with invalid OCC symbol format" do
+          let(:invalid_option_leg) do
+            instance_double(
+              Tastytrade::OrderLeg,
+              symbol: "INVALID_SYMBOL",
+              quantity: 1,
+              action: Tastytrade::OrderAction::BUY_TO_OPEN,
+              instrument_type: "Option"
+            )
+          end
+
+          before do
+            allow(order).to receive(:legs).and_return([invalid_option_leg])
+          end
+
+          it "raises OrderValidationError" do
+            expect { validator.validate!(skip_dry_run: true) }
+              .to raise_error(Tastytrade::OrderValidationError, /Invalid option symbol format/)
+          end
+        end
+
+        context "with expired option" do
+          before do
+            allow(Tastytrade::Models::Option).to receive(:get).with(session,
+"AAPL 240119C00150000").and_return(expired_option)
+            allow(expired_option).to receive(:symbol).and_return("AAPL 231231C00150000")
+          end
+
+          it "raises OrderValidationError" do
+            expect { validator.validate!(skip_dry_run: true) }
+              .to raise_error(Tastytrade::OrderValidationError, /has expired/)
+          end
+        end
+
+        context "with 0 DTE option" do
+          before do
+            allow(Tastytrade::Models::Option).to receive(:get).with(session,
+"AAPL 240119C00150000").and_return(zero_dte_option)
+          end
+
+          it "adds warning about 0 DTE" do
+            validator.validate!(skip_dry_run: true)
+            expect(validator.warnings).to include(/expires today \(0 DTE\)/)
+          end
+
+          it "does not raise error" do
+            expect { validator.validate!(skip_dry_run: true) }.not_to raise_error
+          end
+        end
+
+        context "with far OTM strike" do
+          let(:far_otm_option) do
+            instance_double(
+              Tastytrade::Models::Option,
+              symbol: "AAPL 240119C00250000",
+              expiration_date: Date.new(2024, 1, 19),
+              expired?: false,
+              days_to_expiration: 30,
+              strike_price: BigDecimal("250")
+            )
+          end
+
+          before do
+            allow(Tastytrade::Models::Option).to receive(:get).with(session,
+"AAPL 240119C00150000").and_return(far_otm_option)
+          end
+
+          it "validates without errors (strike validation skipped)" do
+            validator.validate!(skip_dry_run: true)
+            expect(validator.errors).to be_empty
+          end
+        end
+
+        context "when option API call fails" do
+          before do
+            allow(Tastytrade::Models::Option).to receive(:get).with(session, "AAPL 240119C00150000")
+                                                              .and_raise(StandardError, "Option not found")
+          end
+
+          it "raises OrderValidationError with API error" do
+            expect { validator.validate!(skip_dry_run: true) }
+              .to raise_error(Tastytrade::OrderValidationError, /Invalid option symbol.*Option not found/)
+          end
         end
       end
     end

@@ -41,6 +41,125 @@ RSpec.describe Tastytrade::OrderLeg do
       expect(params["instrument-type"]).to eq("Equity")
     end
   end
+
+  describe "option leg support" do
+    it "creates an option leg with OCC symbol" do
+      leg = described_class.new(
+        action: Tastytrade::OrderAction::BUY_TO_OPEN,
+        symbol: "AAPL 240119C00150000",
+        quantity: 1,
+        instrument_type: "Option"
+      )
+
+      expect(leg.action).to eq(Tastytrade::OrderAction::BUY_TO_OPEN)
+      expect(leg.symbol).to eq("AAPL 240119C00150000")
+      expect(leg.quantity).to eq(1)
+      expect(leg.instrument_type).to eq("Option")
+      expect(leg.position_effect).to eq("Opening")
+    end
+
+    it "validates OCC symbol format for options" do
+      expect do
+        described_class.new(
+          action: Tastytrade::OrderAction::BUY_TO_OPEN,
+          symbol: "INVALID_OPTION",
+          quantity: 1,
+          instrument_type: "Option"
+        )
+      end.to raise_error(ArgumentError, /Invalid OCC option symbol format/)
+    end
+
+    it "accepts valid OCC symbols" do
+      valid_symbols = [
+        "AAPL 240119C00150000",
+        "SPY 240630P00420000",
+        "TSLA 241220C00200000",
+        "QQQ 240315P00380000"
+      ]
+
+      valid_symbols.each do |symbol|
+        expect do
+          described_class.new(
+            action: Tastytrade::OrderAction::BUY_TO_OPEN,
+            symbol: symbol,
+            quantity: 1,
+            instrument_type: "Option"
+          )
+        end.not_to raise_error
+      end
+    end
+
+    it "auto-detects position effect for opening orders" do
+      leg = described_class.new(
+        action: Tastytrade::OrderAction::SELL_TO_OPEN,
+        symbol: "AAPL 240119C00150000",
+        quantity: 1,
+        instrument_type: "Option"
+      )
+
+      expect(leg.position_effect).to eq("Opening")
+    end
+
+    it "auto-detects position effect for closing orders" do
+      leg = described_class.new(
+        action: Tastytrade::OrderAction::SELL_TO_CLOSE,
+        symbol: "AAPL 240119C00150000",
+        quantity: 1,
+        instrument_type: "Option"
+      )
+
+      expect(leg.position_effect).to eq("Closing")
+    end
+
+    it "allows explicit position effect override" do
+      leg = described_class.new(
+        action: Tastytrade::OrderAction::BUY_TO_OPEN,
+        symbol: "AAPL 240119C00150000",
+        quantity: 1,
+        instrument_type: "Option",
+        position_effect: "Auto"
+      )
+
+      expect(leg.position_effect).to eq("Auto")
+    end
+
+    it "validates position effect values" do
+      expect do
+        described_class.new(
+          action: Tastytrade::OrderAction::BUY_TO_OPEN,
+          symbol: "AAPL 240119C00150000",
+          quantity: 1,
+          instrument_type: "Option",
+          position_effect: "INVALID"
+        )
+      end.to raise_error(ArgumentError, /Invalid position effect/)
+    end
+
+    it "includes position effect in API params for options" do
+      leg = described_class.new(
+        action: Tastytrade::OrderAction::BUY_TO_OPEN,
+        symbol: "AAPL 240119C00150000",
+        quantity: 1,
+        instrument_type: "Option",
+        position_effect: "Opening"
+      )
+
+      params = leg.to_api_params
+      expect(params["position-effect"]).to eq("Opening")
+    end
+
+    it "excludes position effect for equity orders" do
+      leg = described_class.new(
+        action: Tastytrade::OrderAction::BUY_TO_OPEN,
+        symbol: "AAPL",
+        quantity: 100,
+        instrument_type: "Equity"
+      )
+
+      params = leg.to_api_params
+      expect(params).not_to have_key("position-effect")
+    end
+  end
 end
 
 RSpec.describe Tastytrade::Order do

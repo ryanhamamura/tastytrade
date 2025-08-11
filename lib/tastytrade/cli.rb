@@ -1710,21 +1710,25 @@ module Tastytrade
     def interactive_place_order_advanced
       menu_prompt = create_vim_prompt
 
-      order_mode = menu_prompt.select("Order Entry Mode:", per_page: 3) do |menu|
+      order_mode = menu_prompt.select("Order Entry Mode:", per_page: 5) do |menu|
         menu.enum "."
         menu.help "(Select order complexity level)"
         menu.choice "Quick Order - Basic market/limit orders", :quick
-        menu.choice "Standard Order - Common order types with options", :standard
+        menu.choice "Standard Order - Common order types (equity & options)", :standard
+        menu.choice "Option Strategies - Multi-leg option strategies", :strategies
         menu.choice "Advanced Order - All order types and conditions", :advanced
+        menu.choice "Back", :back
       end
 
-      return if @exit_requested
+      return if @exit_requested || order_mode == :back
 
       case order_mode
       when :quick
         interactive_place_order_quick
       when :standard
         interactive_place_order_standard
+      when :strategies
+        interactive_option_strategies
       when :advanced
         interactive_place_order_full
       end
@@ -1776,6 +1780,16 @@ module Tastytrade
 
       symbol = prompt.ask("Symbol:") { |q| q.modify :up }.upcase
 
+      # Auto-detect if this is an option symbol (OCC format)
+      is_option = symbol.match?(/\A[A-Z0-9]+\s\d{6}[CP]\d{8}\z/)
+
+      if is_option
+        puts pastel.yellow("Option symbol detected: #{symbol}")
+        quantity_label = "Number of contracts:"
+      else
+        quantity_label = "Quantity:"
+      end
+
       action = prompt.select("Action:") do |menu|
         menu.choice "Buy to Open", "buy_to_open"
         menu.choice "Sell to Close", "sell_to_close"
@@ -1783,17 +1797,18 @@ module Tastytrade
         menu.choice "Buy to Close (Cover)", "buy_to_close"
       end
 
-      quantity = prompt.ask("Quantity:", convert: :int)
+      quantity = prompt.ask(quantity_label, convert: :int)
 
       order_type = prompt.select("Order type:") do |menu|
         menu.choice "Market", "market"
         menu.choice "Limit", "limit"
-        menu.choice "Stop", "stop"
+        menu.choice "Stop", "stop" unless is_option  # Options typically don't support stop orders
       end
 
       price = nil
       if order_type == "limit"
-        price = prompt.ask("Limit price:", convert: :float)
+        price_label = is_option ? "Limit price per contract:" : "Limit price:"
+        price = prompt.ask(price_label, convert: :float)
       elsif order_type == "stop"
         price = prompt.ask("Stop price:", convert: :float)
       end
@@ -1809,12 +1824,18 @@ module Tastytrade
       # Confirmation
       puts "\nOrder Summary:"
       puts "  Symbol: #{symbol}"
+      puts "  Type: #{is_option ? pastel.green("Option") : "Equity"}"
       puts "  Action: #{action}"
-      puts "  Quantity: #{quantity}"
-      puts "  Type: #{order_type}"
+      puts "  #{is_option ? "Contracts" : "Quantity"}: #{quantity}"
+      puts "  Order Type: #{order_type}"
       puts "  Price: #{price ? format_currency(price) : "Market"}"
       puts "  Time in Force: #{time_in_force.upcase}"
       puts "  Account: #{account.account_number}"
+
+      if is_option && price
+        total_premium = price * quantity * 100  # 100 shares per contract
+        puts "  Total Premium: #{format_currency(total_premium)}"
+      end
 
       unless prompt.yes?("\nPlace this order?")
         info "Order cancelled"
@@ -1832,6 +1853,7 @@ module Tastytrade
         type: order_type,
         price: price,
         time_in_force: time_in_force,
+        instrument_type: is_option ? "Option" : nil,  # Let CLI::Orders detect automatically if nil
         skip_confirmation: true
       }
 
@@ -1846,6 +1868,278 @@ module Tastytrade
       # Reuse the existing interactive_order method for now
       # This will be enhanced later with more advanced features
       interactive_order
+    end
+
+    def interactive_option_strategies
+      puts pastel.cyan.bold("\n🎯 Option Strategy Builder\n")
+
+      account = @current_account || current_account || select_account_interactively
+      return unless account
+
+      strategy = prompt.select("Select strategy:") do |menu|
+        menu.choice "Vertical Spread (Bull/Bear Call/Put)", :vertical
+        menu.choice "Iron Condor", :iron_condor
+        menu.choice "Strangle", :strangle
+        menu.choice "Straddle", :straddle
+        menu.choice "Back", :back
+      end
+
+      return if strategy == :back
+
+      case strategy
+      when :vertical
+        interactive_vertical_spread(account)
+      when :iron_condor
+        interactive_iron_condor(account)
+      when :strangle
+        interactive_strangle(account)
+      when :straddle
+        interactive_straddle(account)
+      end
+    end
+
+    def interactive_vertical_spread(account)
+      puts pastel.green("\n📈 Vertical Spread Setup\n")
+
+      underlying = prompt.ask("Underlying symbol:") { |q| q.modify :up }.upcase
+
+      spread_type = prompt.select("Spread type:") do |menu|
+        menu.choice "Bull Call Spread (bullish)", :bull_call
+        menu.choice "Bear Call Spread (bearish)", :bear_call
+        menu.choice "Bull Put Spread (bullish)", :bull_put
+        menu.choice "Bear Put Spread (bearish)", :bear_put
+      end
+
+      # For demo purposes, we'll need the user to enter the specific option symbols
+      puts "\nEnter the two option symbols for your spread:"
+      puts pastel.dim("Example: SPY 240119C00450000")
+
+      long_symbol = prompt.ask("Long option symbol:") { |q| q.modify :up }.upcase
+      short_symbol = prompt.ask("Short option symbol:") { |q| q.modify :up }.upcase
+
+      quantity = prompt.ask("Number of spreads:", convert: :int) do |q|
+        q.validate { |v| v.to_i > 0 }
+      end
+
+      price = prompt.ask("Net debit/credit per spread (use negative for credit):", convert: :float)
+
+      # Show summary
+      puts "\n#{pastel.bold("Spread Summary:")}"
+      puts "  Strategy: #{spread_type.to_s.split("_").map(&:capitalize).join(" ")}"
+      puts "  Underlying: #{underlying}"
+      puts "  Long: #{long_symbol}"
+      puts "  Short: #{short_symbol}"
+      puts "  Quantity: #{quantity} spread(s)"
+      puts "  Net #{price >= 0 ? "Debit" : "Credit"}: #{format_currency(price.abs)}"
+      puts "  Total Premium: #{format_currency(price.abs * quantity * 100)}"
+
+      if prompt.yes?("\nPlace this spread order?")
+        orders_command = Tastytrade::CLI::Orders.new
+        orders_command.instance_variable_set(:@current_session, current_session)
+        orders_command.instance_variable_set(:@current_account, account)
+        orders_command.options = {
+          account: account.account_number,
+          strategy: "vertical",
+          legs: "#{long_symbol},#{short_symbol}",
+          quantity: quantity,
+          price: price,
+          skip_confirmation: true
+        }
+
+        with_error_handling do
+          orders_command.option_spread
+        end
+      else
+        info "Spread order cancelled"
+      end
+
+      prompt.keypress("\nPress any key to continue...")
+    end
+
+    def interactive_iron_condor(account)
+      puts pastel.green("\n🦅 Iron Condor Setup\n")
+
+      underlying = prompt.ask("Underlying symbol:") { |q| q.modify :up }.upcase
+
+      puts "\nEnter the four option symbols for your iron condor:"
+      puts pastel.dim("Order: Short Put, Long Put, Short Call, Long Call")
+      puts pastel.dim("Example: SPY 240119P00440000")
+
+      put_short = prompt.ask("Short put symbol:") { |q| q.modify :up }.upcase
+      put_long = prompt.ask("Long put symbol (lower strike):") { |q| q.modify :up }.upcase
+      call_short = prompt.ask("Short call symbol:") { |q| q.modify :up }.upcase
+      call_long = prompt.ask("Long call symbol (higher strike):") { |q| q.modify :up }.upcase
+
+      quantity = prompt.ask("Number of iron condors:", convert: :int) do |q|
+        q.validate { |v| v.to_i > 0 }
+      end
+
+      price = prompt.ask("Net credit per iron condor:", convert: :float) do |q|
+        q.validate { |v| v.to_f > 0 }
+      end
+
+      # Show summary
+      puts "\n#{pastel.bold("Iron Condor Summary:")}"
+      puts "  Underlying: #{underlying}"
+      puts "  Put Side:"
+      puts "    Short: #{put_short}"
+      puts "    Long: #{put_long}"
+      puts "  Call Side:"
+      puts "    Short: #{call_short}"
+      puts "    Long: #{call_long}"
+      puts "  Quantity: #{quantity} iron condor(s)"
+      puts "  Net Credit: #{format_currency(price)}"
+      puts "  Total Credit: #{format_currency(price * quantity * 100)}"
+
+      # Calculate max loss (width of wider spread - credit)
+      # This is simplified - actual calculation would need strike prices
+      puts pastel.dim("  Max Risk: Width of widest spread - credit received")
+
+      if prompt.yes?("\nPlace this iron condor order?")
+        orders_command = Tastytrade::CLI::Orders.new
+        orders_command.instance_variable_set(:@current_session, current_session)
+        orders_command.instance_variable_set(:@current_account, account)
+        orders_command.options = {
+          account: account.account_number,
+          strategy: "iron_condor",
+          legs: "#{put_short},#{put_long},#{call_short},#{call_long}",
+          quantity: quantity,
+          price: price,
+          skip_confirmation: true
+        }
+
+        with_error_handling do
+          orders_command.option_spread
+        end
+      else
+        info "Iron condor order cancelled"
+      end
+
+      prompt.keypress("\nPress any key to continue...")
+    end
+
+    def interactive_strangle(account)
+      puts pastel.green("\n🔄 Strangle Setup\n")
+
+      underlying = prompt.ask("Underlying symbol:") { |q| q.modify :up }.upcase
+
+      action = prompt.select("Strangle direction:") do |menu|
+        menu.choice "Long Strangle (buy both)", :long
+        menu.choice "Short Strangle (sell both)", :short
+      end
+
+      puts "\nEnter the option symbols for your strangle:"
+      puts pastel.dim("Use different strikes for put and call")
+
+      put_symbol = prompt.ask("Put option symbol:") { |q| q.modify :up }.upcase
+      call_symbol = prompt.ask("Call option symbol:") { |q| q.modify :up }.upcase
+
+      quantity = prompt.ask("Number of strangles:", convert: :int) do |q|
+        q.validate { |v| v.to_i > 0 }
+      end
+
+      price_label = action == :long ? "Total debit per strangle:" : "Total credit per strangle:"
+      price = prompt.ask(price_label, convert: :float) do |q|
+        q.validate { |v| v.to_f > 0 }
+      end
+
+      # Show summary
+      puts "\n#{pastel.bold("Strangle Summary:")}"
+      puts "  Type: #{action == :long ? "Long" : "Short"} Strangle"
+      puts "  Underlying: #{underlying}"
+      puts "  Put: #{put_symbol}"
+      puts "  Call: #{call_symbol}"
+      puts "  Quantity: #{quantity} strangle(s)"
+      puts "  Net #{action == :long ? "Debit" : "Credit"}: #{format_currency(price)}"
+      puts "  Total Premium: #{format_currency(price * quantity * 100)}"
+
+      if prompt.yes?("\nPlace this strangle order?")
+        orders_command = Tastytrade::CLI::Orders.new
+        orders_command.instance_variable_set(:@current_session, current_session)
+        orders_command.instance_variable_set(:@current_account, account)
+        orders_command.options = {
+          account: account.account_number,
+          strategy: "strangle",
+          legs: "#{put_symbol},#{call_symbol}",
+          quantity: quantity,
+          price: price,
+          action: action == :long ? "buy" : "sell",
+          skip_confirmation: true
+        }
+
+        with_error_handling do
+          orders_command.option_spread
+        end
+      else
+        info "Strangle order cancelled"
+      end
+
+      prompt.keypress("\nPress any key to continue...")
+    end
+
+    def interactive_straddle(account)
+      puts pastel.green("\n⚖️ Straddle Setup\n")
+
+      underlying = prompt.ask("Underlying symbol:") { |q| q.modify :up }.upcase
+
+      action = prompt.select("Straddle direction:") do |menu|
+        menu.choice "Long Straddle (buy both)", :long
+        menu.choice "Short Straddle (sell both)", :short
+      end
+
+      puts "\nEnter strike and expiration for your straddle:"
+
+      strike = prompt.ask("Strike price:", convert: :float) do |q|
+        q.validate { |v| v.to_f > 0 }
+      end
+
+      expiration = prompt.ask("Expiration date (YYMMDD):") do |q|
+        q.validate(/^\d{6}$/, "Must be in YYMMDD format")
+      end
+
+      quantity = prompt.ask("Number of straddles:", convert: :int) do |q|
+        q.validate { |v| v.to_i > 0 }
+      end
+
+      price_label = action == :long ? "Total debit per straddle:" : "Total credit per straddle:"
+      price = prompt.ask(price_label, convert: :float) do |q|
+        q.validate { |v| v.to_f > 0 }
+      end
+
+      # Show summary
+      puts "\n#{pastel.bold("Straddle Summary:")}"
+      puts "  Type: #{action == :long ? "Long" : "Short"} Straddle"
+      puts "  Underlying: #{underlying}"
+      puts "  Strike: #{format_currency(strike)}"
+      puts "  Expiration: #{expiration}"
+      puts "  Quantity: #{quantity} straddle(s)"
+      puts "  Net #{action == :long ? "Debit" : "Credit"}: #{format_currency(price)}"
+      puts "  Total Premium: #{format_currency(price * quantity * 100)}"
+
+      if prompt.yes?("\nPlace this straddle order?")
+        orders_command = Tastytrade::CLI::Orders.new
+        orders_command.instance_variable_set(:@current_session, current_session)
+        orders_command.instance_variable_set(:@current_account, account)
+        orders_command.options = {
+          account: account.account_number,
+          strategy: "straddle",
+          underlying: underlying,
+          strike: strike,
+          expiration: expiration,
+          quantity: quantity,
+          price: price,
+          action: action == :long ? "buy" : "sell",
+          skip_confirmation: true
+        }
+
+        with_error_handling do
+          orders_command.option_spread
+        end
+      else
+        info "Straddle order cancelled"
+      end
+
+      prompt.keypress("\nPress any key to continue...")
     end
 
     def interactive_get_order
