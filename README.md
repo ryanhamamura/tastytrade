@@ -8,27 +8,63 @@
 
 **⚠️ IMPORTANT DISCLAIMER**: This is an **unofficial** SDK and is not affiliated with, endorsed by, or sponsored by Tastytrade, Tastyworks, or any of their affiliates. This is an independent project created to help Ruby developers interact with the Tastytrade API.
 
-This Ruby gem provides a simple interface to interact with the Tastytrade API, allowing you to:
+This Ruby gem provides a comprehensive interface to interact with the Tastytrade API, allowing you to:
 - Authenticate with your Tastytrade account
 - Retrieve account information and balances
-- Access market data
-- Place and manage orders
+- Access real-time option chains and market data
+- Place and manage complex option orders
+- Execute advanced option strategies (spreads, butterflies, iron condors, etc.)
 - Monitor positions and transactions
+- Calculate and track buying power
 
 ## Features
 
-- Secure authentication with Tastytrade API
-- Real-time market data access
-- Account management and portfolio tracking
-- Order placement and management with dry-run support
-- Position monitoring
-- Transaction history with filtering and grouping
-- Buying power calculations and monitoring
-- CLI with interactive mode and rich formatting
+### Core Functionality
+- 🔐 Secure authentication with session management
+- 💼 Complete account management and portfolio tracking
+- 📊 Real-time option chains with Greeks
+- 💰 Buying power calculations and monitoring
+- 📈 Position and transaction management
+- 🧪 Full sandbox/test environment support
 
-## Roadmap
+### Option Trading
+- **Single-leg orders**: Buy/sell calls and puts
+- **Multi-leg strategies**: 
+  - Vertical spreads (bull/bear call/put spreads)
+  - Iron Condors (4-leg neutral strategy)
+  - Iron Butterflies (4-leg ATM neutral strategy)
+  - Butterfly Spreads (3-leg with 1-2-1 ratio)
+  - Calendar Spreads (time spreads)
+  - Diagonal Spreads (calendar + vertical)
+  - Strangles and Straddles
+- **Order features**:
+  - Dry-run validation before placement
+  - Multiple time-in-force options (DAY, GTC, GTD, IOC)
+  - Limit and market orders
+  - Net debit/credit calculations
 
-See [ROADMAP.md](ROADMAP.md) for the detailed development roadmap. Track progress on our [GitHub Project Board](https://github.com/users/ryanhamamura/projects/1).
+### CLI Features
+- 🎨 Rich terminal formatting with colors
+- 📱 Interactive mode with menu navigation
+- 🔍 Advanced filtering and search
+- 📊 Multiple output formats (table, JSON, CSV)
+- ⚡ Vim-style keyboard shortcuts
+
+## Quick Start
+
+```bash
+# Install the gem
+gem install tastytrade
+
+# Set up sandbox credentials (recommended for testing)
+cp .env.sandbox.example .env.sandbox
+# Edit .env.sandbox with your credentials
+
+# Login to sandbox and explore
+tastytrade login --test
+tastytrade option chain SPY --strikes 5
+tastytrade option butterfly SPY --type call --center-strike 450 --wing-width 10 --dry-run
+```
 
 ## Installation
 
@@ -106,15 +142,14 @@ The gem includes a command-line interface for common operations:
 See [docs/CREDENTIALS.md](docs/CREDENTIALS.md) for detailed credential management.
 
 ```bash
-# Setup credentials with .env files (recommended)
-cp .env.example .env                    # For production
+# Setup credentials with .env file (recommended)
 cp .env.sandbox.example .env.sandbox    # For sandbox testing
 
-# Login to production
-tastytrade login                        # Uses .env file
-
-# Login to sandbox (testing)
+# Login to sandbox (testing) - recommended for development
 tastytrade login --test                 # Uses .env.sandbox file
+
+# Login to production
+tastytrade login                        # For live trading
 
 # Login with remember option for automatic session refresh
 tastytrade login --remember
@@ -166,25 +201,96 @@ tastytrade positions --include-closed
 
 ```bash
 # View option chain for a symbol
-tastytrade option --symbol SPY
+tastytrade option chain SPY
 
 # Filter by days to expiration
-tastytrade option --symbol SPY --dte 30
+tastytrade option chain SPY --dte 30
 
-# Filter by expiration type
-tastytrade option --symbol SPY --expiration-type weekly
+# Filter by strike count around ATM
+tastytrade option chain SPY --strikes 10
 
-# Output in different formats
-tastytrade option --symbol SPY --format json    # JSON output
-tastytrade option --symbol SPY --format compact # Compact view
-tastytrade option --symbol SPY --format table   # Table view (default)
+# Filter by moneyness
+tastytrade option chain SPY --moneyness otm
 
-# Use nested chain format for more details
-tastytrade option --symbol SPY --nested
+# Show Greeks
+tastytrade option chain SPY --greeks
 
-# Combine filters
-tastytrade option --symbol AAPL --dte 30 --expiration-type monthly
+# Output formats
+tastytrade option chain SPY --format compact  # Compact view
+tastytrade option chain SPY --format json     # JSON output
+tastytrade option chain SPY --format csv      # CSV export
 ```
+
+#### Option Trading Strategies
+
+##### Single-Leg Options
+
+```bash
+# Buy call option
+tastytrade option buy call SPY --strike 450 --expiration 2025-02-21 --quantity 1
+
+# Sell put option
+tastytrade option sell put SPY --strike 440 --expiration 2025-02-21 --quantity 1
+
+# Use delta targeting instead of strike
+tastytrade option buy call SPY --delta 0.30 --dte 30
+
+# Dry-run to validate before placing
+tastytrade option buy call SPY --strike 450 --dte 30 --dry-run
+```
+
+##### Multi-Leg Strategies
+
+```bash
+# Vertical Spread (Bull Call Spread)
+tastytrade option spread SPY --type call \
+  --long-strike 445 --short-strike 455 \
+  --expiration 2025-02-21 --dry-run
+
+# Iron Condor (4-leg neutral strategy)
+tastytrade option iron_condor SPY \
+  --put-short 440 --put-long 430 \
+  --call-short 460 --call-long 470 \
+  --expiration 2025-02-21 --dry-run
+
+# Iron Butterfly (4-leg ATM neutral strategy)
+tastytrade option iron_butterfly SPY \
+  --center-strike 450 --wing-width 10 \
+  --expiration 2025-02-21 --dry-run
+
+# Butterfly Spread (3-leg with 1-2-1 ratio)
+tastytrade option butterfly SPY --type call \
+  --center-strike 450 --wing-width 10 \
+  --expiration 2025-02-21 --dry-run
+
+# Calendar Spread (time spread)
+tastytrade option calendar SPY --type call \
+  --strike 450 \
+  --short-dte 30 --long-dte 60 \
+  --dry-run
+
+# Diagonal Spread (calendar + vertical)
+tastytrade option diagonal SPY --type call \
+  --short-strike 450 --long-strike 455 \
+  --short-dte 30 --long-dte 60 \
+  --dry-run
+
+# Strangle
+tastytrade option strangle SPY \
+  --call-strike 455 --put-strike 445 \
+  --expiration 2025-02-21 --dry-run
+
+# Straddle
+tastytrade option straddle SPY \
+  --strike 450 \
+  --expiration 2025-02-21 --dry-run
+```
+
+All option commands support:
+- `--dry-run` flag for validation without placement
+- `--limit` for setting limit prices
+- `--quantity` for position sizing
+- `--dte` for days to expiration targeting
 
 #### Interactive Mode
 
@@ -473,6 +579,8 @@ bid_ask_spread_percentage(5.50, 5.55) # => 0.91
 
 ### Order Placement
 
+#### Stock Orders
+
 ```ruby
 # Create an order leg for buying stock
 leg = Tastytrade::OrderLeg.new(
@@ -499,23 +607,70 @@ response = account.place_order(session, market_order)
 
 # Dry run (simulate order without placing)
 response = account.place_order(session, limit_order, dry_run: true)
+```
 
-# Check order response
-puts response.order_id           # => "123456"
-puts response.status             # => "Filled"
+#### Option Orders
 
-# Dry run orders return a BuyingPowerEffect object
-if response.buying_power_effect.is_a?(Tastytrade::Models::BuyingPowerEffect)
-  bp_effect = response.buying_power_effect
-  puts bp_effect.buying_power_change_amount # => BigDecimal("15050.00")
-  puts bp_effect.buying_power_usage_percentage # => BigDecimal("75.25")
-  puts bp_effect.exceeds_threshold?(80) # => false
-  puts bp_effect.debit? # => true
-else
-  puts response.buying_power_effect # => BigDecimal("-15050.00")
-end
+```ruby
+# Use the OptionOrderBuilder for easier option order creation
+builder = Tastytrade::OptionOrderBuilder.new(session, account)
 
-puts response.warnings           # => [] or warning messages
+# Single-leg options
+call_option = find_option(symbol: "SPY", strike: 450, type: :call, dte: 30)
+order = builder.buy_call(call_option, quantity: 1, price: 2.50)
+response = account.place_order(session, order)
+
+# Vertical spread
+long_option = find_option(symbol: "SPY", strike: 445, type: :call, dte: 30)
+short_option = find_option(symbol: "SPY", strike: 455, type: :call, dte: 30)
+spread_order = builder.vertical_spread(long_option, short_option, 1, price: 3.00)
+
+# Iron Butterfly (4-leg neutral strategy)
+short_call = find_option(symbol: "SPY", strike: 450, type: :call, dte: 30)
+long_call = find_option(symbol: "SPY", strike: 460, type: :call, dte: 30)
+short_put = find_option(symbol: "SPY", strike: 450, type: :put, dte: 30)
+long_put = find_option(symbol: "SPY", strike: 440, type: :put, dte: 30)
+
+iron_butterfly = builder.iron_butterfly(
+  short_call, long_call, short_put, long_put,
+  quantity: 1,
+  price: 3.00  # Net credit
+)
+
+# Butterfly Spread (3-leg with 1-2-1 ratio)
+long_low = find_option(symbol: "SPY", strike: 440, type: :call, dte: 30)
+short_middle = find_option(symbol: "SPY", strike: 450, type: :call, dte: 30)
+long_high = find_option(symbol: "SPY", strike: 460, type: :call, dte: 30)
+
+butterfly = builder.butterfly_spread(
+  long_low, short_middle, long_high,
+  quantity: 1,  # Middle leg automatically gets 2x quantity
+  price: 1.50   # Net debit
+)
+
+# Calendar Spread (time spread)
+short_option = find_option(symbol: "SPY", strike: 450, type: :call, dte: 30)
+long_option = find_option(symbol: "SPY", strike: 450, type: :call, dte: 60)
+
+calendar = builder.calendar_spread(
+  short_option, long_option,
+  quantity: 1,
+  price: 1.00  # Net debit
+)
+
+# Diagonal Spread (different strikes AND expirations)
+short_option = find_option(symbol: "SPY", strike: 450, type: :call, dte: 30)
+long_option = find_option(symbol: "SPY", strike: 455, type: :call, dte: 60)
+
+diagonal = builder.diagonal_spread(
+  short_option, long_option,
+  quantity: 1,
+  price: 2.00  # Net debit
+)
+
+# Calculate net premium for any multi-leg order
+net_premium = builder.calculate_net_premium(spread_order)
+puts "Net premium: $#{net_premium}" # Positive = credit, negative = debit
 ```
 
 ### Order Management
@@ -736,9 +891,18 @@ bundle exec rake install
 
 ## Documentation
 
-TODO: Add links to additional documentation
-- [API Documentation](https://rubydoc.info/gems/tastytrade)
-- [Wiki](https://github.com/ryanhamamura/tastytrade/wiki)
+### Guides
+- [Advanced Option Strategies](docs/ADVANCED_STRATEGIES.md) - Iron butterflies, calendar spreads, and more
+- [Credential Management](docs/CREDENTIALS.md) - Authentication and credential storage
+- [CHANGELOG](CHANGELOG.md) - Version history and release notes
+
+### API Documentation
+- [RubyDoc](https://rubydoc.info/gems/tastytrade) - Full API documentation
+- [GitHub Wiki](https://github.com/ryanhamamura/tastytrade/wiki) - Additional guides and examples
+
+### Development
+- [Contributing Guide](CONTRIBUTING.md) - How to contribute to the project
+- [Roadmap](ROADMAP.md) - Future development plans
 
 ## Contributing
 
