@@ -104,7 +104,13 @@ module Tastytrade
         def get(session, symbol, **options)
           params = options.merge(symbol: symbol)
           response = session.get("/option-chains/#{symbol}/nested", params: params)
-          new(response["data"])
+
+          # The API returns data.items array with a single item containing the full chain
+          if response["data"] && response["data"]["items"] && response["data"]["items"].first
+            new(response["data"]["items"].first)
+          else
+            new(response["data"] || {})
+          end
         end
       end
 
@@ -134,21 +140,24 @@ module Tastytrade
       #
       # @return [Array<Expiration>] Array of weekly Expiration objects
       def weekly_expirations
-        @expirations.select(&:weekly?)
+        filtered_expirations = @expirations.select(&:weekly?)
+        create_filtered_chain(filtered_expirations)
       end
 
       # Returns only monthly (regular) expirations
       #
-      # @return [Array<Expiration>] Array of monthly Expiration objects
+      # @return [NestedOptionChain] New chain with monthly expirations only
       def monthly_expirations
-        @expirations.select(&:monthly?)
+        filtered_expirations = @expirations.select(&:monthly?)
+        create_filtered_chain(filtered_expirations)
       end
 
       # Returns only quarterly expirations
       #
-      # @return [Array<Expiration>] Array of quarterly Expiration objects
+      # @return [NestedOptionChain] New chain with quarterly expirations only
       def quarterly_expirations
-        @expirations.select(&:quarterly?)
+        filtered_expirations = @expirations.select(&:quarterly?)
+        create_filtered_chain(filtered_expirations)
       end
 
       # Filters expirations by days to expiration range
@@ -161,7 +170,7 @@ module Tastytrade
       #   near_term = chain.filter_by_dte(max_dte: 30)
       #   mid_term = chain.filter_by_dte(min_dte: 30, max_dte: 60)
       def filter_by_dte(min_dte: nil, max_dte: nil)
-        @expirations.select do |exp|
+        filtered_expirations = @expirations.select do |exp|
           dte = exp.days_to_expiration
           next false if dte.nil?
           next false if min_dte && dte < min_dte
@@ -169,6 +178,8 @@ module Tastytrade
 
           true
         end
+
+        create_filtered_chain(filtered_expirations)
       end
 
       # Returns the expiration closest to today's date
@@ -238,6 +249,26 @@ module Tastytrade
       end
 
       private
+
+      def create_filtered_chain(filtered_expirations)
+        # Create a new chain with filtered expirations
+        filtered_data = @data.dup
+        # Keep the expirations as objects - they'll be parsed in initialize
+        filtered_data["expirations"] = filtered_expirations
+
+        # Create new instance, but we need to bypass normal initialization
+        # Instead, create a minimal data structure that will work
+        new_chain = self.class.allocate
+        new_chain.instance_variable_set(:@data, filtered_data)
+        new_chain.instance_variable_set(:@underlying_symbol, @underlying_symbol)
+        new_chain.instance_variable_set(:@root_symbol, @root_symbol)
+        new_chain.instance_variable_set(:@option_chain_type, @option_chain_type)
+        new_chain.instance_variable_set(:@shares_per_contract, @shares_per_contract)
+        new_chain.instance_variable_set(:@tick_sizes, @tick_sizes)
+        new_chain.instance_variable_set(:@deliverables, @deliverables)
+        new_chain.instance_variable_set(:@expirations, filtered_expirations)
+        new_chain
+      end
 
       def parse_attributes
         @underlying_symbol = @data["underlying-symbol"] || @data["underlying_symbol"]

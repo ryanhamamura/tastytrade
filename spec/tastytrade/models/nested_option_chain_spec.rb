@@ -150,16 +150,16 @@ RSpec.describe Tastytrade::Models::NestedOptionChain do
   describe "#weekly_expirations" do
     it "returns only weekly expirations" do
       weeklies = nested_chain.weekly_expirations
-      expect(weeklies.length).to eq(1)
-      expect(weeklies.first.expiration_type).to eq("Weekly")
+      expect(weeklies.expirations.length).to eq(1)
+      expect(weeklies.expirations.first.expiration_type).to eq("Weekly")
     end
   end
 
   describe "#monthly_expirations" do
     it "returns only monthly expirations" do
       monthlies = nested_chain.monthly_expirations
-      expect(monthlies.length).to eq(1)
-      expect(monthlies.first.expiration_type).to eq("Regular")
+      expect(monthlies.expirations.length).to eq(1)
+      expect(monthlies.expirations.first.expiration_type).to eq("Regular")
     end
   end
 
@@ -169,28 +169,28 @@ RSpec.describe Tastytrade::Models::NestedOptionChain do
       data["expirations"][0]["expiration-type"] = "Quarterly"
       chain = described_class.new(data)
       quarterlies = chain.quarterly_expirations
-      expect(quarterlies.length).to eq(1)
-      expect(quarterlies.first.expiration_type).to eq("Quarterly")
+      expect(quarterlies.expirations.length).to eq(1)
+      expect(quarterlies.expirations.first.expiration_type).to eq("Quarterly")
     end
   end
 
   describe "#filter_by_dte" do
     it "filters by minimum DTE" do
       filtered = nested_chain.filter_by_dte(min_dte: 35)
-      expect(filtered.length).to eq(1)
-      expect(filtered.first.days_to_expiration).to eq(37)
+      expect(filtered.expirations.length).to eq(1)
+      expect(filtered.expirations.first.days_to_expiration).to eq(37)
     end
 
     it "filters by maximum DTE" do
       filtered = nested_chain.filter_by_dte(max_dte: 35)
-      expect(filtered.length).to eq(1)
-      expect(filtered.first.days_to_expiration).to eq(30)
+      expect(filtered.expirations.length).to eq(1)
+      expect(filtered.expirations.first.days_to_expiration).to eq(30)
     end
 
     it "filters by DTE range" do
       filtered = nested_chain.filter_by_dte(min_dte: 25, max_dte: 35)
-      expect(filtered.length).to eq(1)
-      expect(filtered.first.days_to_expiration).to eq(30)
+      expect(filtered.expirations.length).to eq(1)
+      expect(filtered.expirations.first.days_to_expiration).to eq(30)
     end
 
     it "handles nil DTE values" do
@@ -198,7 +198,7 @@ RSpec.describe Tastytrade::Models::NestedOptionChain do
       data["expirations"][0]["days-to-expiration"] = nil
       chain = described_class.new(data)
       filtered = chain.filter_by_dte(min_dte: 10)
-      expect(filtered.length).to eq(1) # Only the one with valid DTE
+      expect(filtered.expirations.length).to eq(1) # Only the one with valid DTE
     end
   end
 

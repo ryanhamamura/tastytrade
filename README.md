@@ -158,6 +158,46 @@ tastytrade trading_status --account 5WT0001
 tastytrade positions --include-closed
 ```
 
+#### Option Chains
+
+```bash
+# View option chain for a symbol
+tastytrade option --symbol SPY
+
+# Filter by days to expiration
+tastytrade option --symbol SPY --dte 30
+
+# Filter by expiration type
+tastytrade option --symbol SPY --expiration-type weekly
+
+# Output in different formats
+tastytrade option --symbol SPY --format json    # JSON output
+tastytrade option --symbol SPY --format compact # Compact view
+tastytrade option --symbol SPY --format table   # Table view (default)
+
+# Use nested chain format for more details
+tastytrade option --symbol SPY --nested
+
+# Combine filters
+tastytrade option --symbol AAPL --dte 30 --expiration-type monthly
+```
+
+#### Interactive Mode
+
+The CLI includes an interactive mode with menu-driven navigation:
+
+```bash
+# Login and enter interactive mode
+tastytrade login
+
+# Interactive features include:
+# - Browse option chains with arrow key navigation
+# - Select expirations and strikes interactively
+# - View option details
+# - Create buy/sell orders
+# - Filter by various criteria
+```
+
 #### Transaction History
 
 ```bash
@@ -348,6 +388,44 @@ positions.each do |position|
   position.long? # => true
   position.short? # => false
 end
+```
+
+### Option Chains
+
+```ruby
+# Get option chain for a symbol
+chain = Tastytrade::Models::OptionChain.get_chain(session, "SPY")
+
+# Access expirations
+chain.expiration_dates.each do |date|
+  options = chain.options_for_expiration(date)
+  puts "#{date}: #{options.size} options"
+end
+
+# Get nested option chain with more details
+nested_chain = Tastytrade::Models::NestedOptionChain.get(session, "SPY")
+
+# Access strikes for an expiration
+expiration = nested_chain.expirations.first
+expiration.strikes.each do |strike|
+  puts "Strike #{strike.strike_price}: Call=#{strike.call}, Put=#{strike.put}"
+end
+
+# Filter options by DTE
+near_term = chain.filter_by_dte(max_dte: 30)
+puts "Near-term options: #{near_term.all_options.size}"
+
+# Filter by expiration type
+weeklies = chain.weekly_expirations
+monthlies = chain.monthly_expirations
+
+# Filter by moneyness (requires current price)
+current_price = BigDecimal("450")
+itm_options = chain.filter_by_moneyness("ITM", current_price)
+atm_strike = chain.find_atm_strike(current_price)
+
+# Get specific strikes around ATM
+focused_chain = chain.filter_by_strikes(5, current_price) # 5 strikes around ATM
 ```
 
 ### Order Placement
