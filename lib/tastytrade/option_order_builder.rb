@@ -5,8 +5,24 @@ require_relative "models/option"
 require "bigdecimal"
 
 module Tastytrade
+  # Builder class for creating option orders with validation and automatic leg construction
+  #
+  # Provides methods for building single-leg and multi-leg option orders with proper
+  # action sequencing, premium calculations, and validation. Handles complex strategies
+  # like spreads, strangles, straddles, and iron condors.
+  #
+  # @example Basic usage
+  #   builder = OptionOrderBuilder.new(session, account)
+  #   order = builder.buy_call(option, 1, price: 2.50)
+  #
+  # @example Multi-leg strategy
+  #   spread = builder.vertical_spread(long_option, short_option, 1)
+  #   straddle = builder.straddle(put_option, call_option, 1)
   class OptionOrderBuilder
+    # Raised when an invalid strategy is requested
     class InvalidStrategyError < StandardError; end
+
+    # Raised when an invalid option is provided
     class InvalidOptionError < StandardError; end
 
     POSITION_EFFECTS = {
@@ -163,18 +179,24 @@ module Tastytrade
     end
 
     def straddle(
-      option_strike,
-      expiration,
+      put_option,
+      call_option,
       quantity,
       action: OrderAction::BUY_TO_OPEN,
       price: nil,
       time_in_force: OrderTimeInForce::DAY
     )
-      put_symbol = build_option_symbol(option_strike, expiration, "P")
-      call_symbol = build_option_symbol(option_strike, expiration, "C")
+      validate_option!(put_option)
+      validate_option!(call_option)
 
-      put_option = Models::Option.get(session, put_symbol)
-      call_option = Models::Option.get(session, call_symbol)
+      # Ensure both options have same strike and expiration
+      if put_option.strike_price != call_option.strike_price
+        raise InvalidStrategyError, "Put and call must have same strike price for straddle"
+      end
+
+      if put_option.expiration_date != call_option.expiration_date
+        raise InvalidStrategyError, "Put and call must have same expiration for straddle"
+      end
 
       legs = [
         build_option_leg(put_option, quantity, action),
@@ -219,11 +241,14 @@ module Tastytrade
 
     def validate_option!(option)
       raise InvalidOptionError, "Option cannot be nil" if option.nil?
-      # Allow test doubles or real Option objects
-      unless option.is_a?(Models::Option) || option.respond_to?(:expired?)
-        raise InvalidOptionError, "Invalid option type"
+      # Allow test doubles, real Option objects, or objects with option-like attributes
+      unless option.is_a?(Models::Option) ||
+             option.respond_to?(:symbol) ||
+             option.respond_to?(:strike_price) ||
+             option.respond_to?(:expired?)
+        raise InvalidOptionError, "Invalid option type: #{option.class}"
       end
-      raise InvalidOptionError, "Option is expired" if option.expired?
+      raise InvalidOptionError, "Option is expired" if option.respond_to?(:expired?) && option.expired?
     end
 
     def validate_vertical_spread!(long_option, short_option)
@@ -305,9 +330,12 @@ module Tastytrade
     end
 
     def build_option_leg(option, quantity, action, position_effect = :auto)
+      # Clean up the symbol - remove extra spaces
+      symbol = option.symbol.gsub(/\s+/, " ").strip if option.symbol
+
       OrderLeg.new(
         action: action,
-        symbol: option.symbol,
+        symbol: symbol,
         quantity: quantity,
         instrument_type: "Option",
         position_effect: POSITION_EFFECTS[position_effect]

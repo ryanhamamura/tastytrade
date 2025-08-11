@@ -2,6 +2,23 @@
 # frozen_string_literal: true
 
 require "bundler/setup"
+
+# Load appropriate .env file based on --test flag
+# This happens before requiring the gem so env vars are available
+begin
+  require "dotenv"
+  if ARGV.include?("--test")
+    env_file = File.expand_path("../.env.sandbox", __dir__)
+    Dotenv.load(env_file) if File.exist?(env_file)
+  else
+    env_file = File.expand_path("../.env", __dir__)
+    Dotenv.load(env_file) if File.exist?(env_file)
+  end
+rescue LoadError
+  # Dotenv is a development dependency, so it might not be available in production
+  # That's okay - we can still use regular environment variables
+end
+
 require "tastytrade"
 require "tastytrade/cli"
 

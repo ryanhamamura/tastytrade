@@ -112,7 +112,59 @@ module Tastytrade
       format("%.#{precision}f", value)
     end
 
+      # Format Greek values with type-specific precision
+      #
+      # @param value [Float, nil] Greek value to format
+      # @param greek_type [Symbol] Type of Greek (:delta, :gamma, :theta, :vega, :rho)
+      # @return [String] Formatted Greek string
+    def format_greek(value, greek_type)
+      return "-" unless value
+
+      case greek_type
+      when :delta
+        format("%.3f", value)
+      when :gamma, :theta, :vega, :rho
+        format("%.4f", value)
+      else
+        format("%.4f", value)
+      end
+    end
+
+      # Format currency values
+      #
+      # @param amount [Float, BigDecimal, nil] Amount to format
+      # @return [String] Formatted currency string
+    def format_currency(amount)
+      return "-" unless amount
+      "$#{"%.2f" % amount.to_f}"
+    end
+
+      # Format volume numbers with K/M suffixes
+      #
+      # @param volume [Integer, nil] Volume to format
+      # @return [String] Formatted volume string
+    def format_volume(volume)
+      return "-" unless volume && volume > 0
+
+      if volume >= 1_000_000
+        "#{"%.1f" % (volume / 1_000_000.0)}M"
+      elsif volume >= 1_000
+        "#{"%.1f" % (volume / 1_000.0)}K"
+      else
+        volume.to_s
+      end
+    end
+
       # Format implied volatility as percentage
+      #
+      # @param iv [Float, nil] Implied volatility (as decimal)
+      # @return [String] Formatted IV percentage
+    def format_iv_percentage(iv)
+      return "-" unless iv
+      "#{"%.1f" % (iv * 100)}%"
+    end
+
+      # Format implied volatility as percentage (alias)
       #
       # @param iv [Float, nil] Implied volatility (as decimal)
       # @return [String] Formatted IV percentage

@@ -376,6 +376,32 @@ module Tastytrade
       def set_streamer_symbol
         @streamer_symbol = self.class.occ_to_streamer_symbol(@symbol)
       end
+
+      # Alias for days_to_expiration for convenience
+      alias_method :dte, :days_to_expiration
+
+      # Convert option to hash for JSON serialization
+      def to_h
+        {
+          symbol: symbol,
+          display_symbol: display_symbol,
+          underlying_symbol: underlying_symbol,
+          option_type: option_type,
+          strike_price: strike_price,
+          expiration_date: expiration_date,
+          days_to_expiration: days_to_expiration,
+          bid: bid,
+          ask: ask,
+          delta: delta,
+          gamma: gamma,
+          theta: theta,
+          vega: vega,
+          rho: rho,
+          implied_volatility: implied_volatility,
+          volume: volume,
+          open_interest: open_interest
+        }.compact
+      end
     end
   end
 end

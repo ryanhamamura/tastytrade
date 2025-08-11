@@ -10,14 +10,19 @@ module Tastytrade
     # Create a session from environment variables
     #
     # @return [Session, nil] Session instance or nil if environment variables not set
-    def self.from_environment
+    def self.from_environment(is_test: nil)
       username = ENV["TASTYTRADE_USERNAME"] || ENV["TT_USERNAME"]
       password = ENV["TASTYTRADE_PASSWORD"] || ENV["TT_PASSWORD"]
 
       return nil unless username && password
 
       remember = ENV["TASTYTRADE_REMEMBER"]&.downcase == "true" || ENV["TT_REMEMBER"]&.downcase == "true"
-      is_test = ENV["TASTYTRADE_ENVIRONMENT"]&.downcase == "sandbox" || ENV["TT_ENVIRONMENT"]&.downcase == "sandbox"
+
+      # Use passed is_test value, or check environment variable as fallback
+      if is_test.nil?
+        is_test = ENV["TASTYTRADE_ENVIRONMENT"]&.downcase == "sandbox" ||
+                  ENV["TT_ENVIRONMENT"]&.downcase == "sandbox"
+      end
 
       new(
         username: username,
