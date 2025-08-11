@@ -428,6 +428,45 @@ atm_strike = chain.find_atm_strike(current_price)
 focused_chain = chain.filter_by_strikes(5, current_price) # 5 strikes around ATM
 ```
 
+#### Option Chain Display Formatting
+
+The gem includes a professional option chain formatter with colors, Greeks, and multiple display formats:
+
+```ruby
+# Create a formatter with color support
+formatter = Tastytrade::OptionChainFormatter.new(pastel: Pastel.new)
+
+# Display option chain with colors and formatting
+puts formatter.format_table(chain, 
+  current_price: 450.25,
+  show_greeks: false,  # Set to true to show Greeks
+  format: :detailed     # :detailed, :compact, or :greeks
+)
+
+# Export to CSV for analysis
+csv_data = formatter.to_csv(chain, current_price: 450.25)
+File.write("option_chain.csv", csv_data)
+
+# Export to JSON
+json_data = formatter.to_json(chain, current_price: 450.25)
+
+# Use helper methods for custom formatting
+include Tastytrade::OptionHelpers
+
+# Format option values
+format_option_volume(1234)        # => "1.2K"
+format_option_currency(5.50)      # => "$5.50"
+format_implied_volatility(0.185)  # => "18.5%"
+
+# Calculate moneyness
+option_moneyness(445, 450, "Call") # => "ITM"
+option_moneyness(455, 450, "Put")  # => "ITM"
+
+# Analyze spreads
+bid_ask_spread(5.50, 5.55)           # => 0.05
+bid_ask_spread_percentage(5.50, 5.55) # => 0.91
+```
+
 ### Order Placement
 
 ```ruby

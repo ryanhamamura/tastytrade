@@ -38,6 +38,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   # Runtime dependencies
+  spec.add_dependency "csv", "~> 3.3"
   spec.add_dependency "faraday", "~> 2.12"
   spec.add_dependency "faraday-retry", "~> 2.2"
   spec.add_dependency "pastel", "~> 0.8"
