@@ -8,6 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Advanced option chain display formatter with colors and Greeks (#55)
+  - Created `OptionChainFormatter` class for professional option chain visualization:
+    - ITM/ATM/OTM color coding (green/yellow/red)
+    - Bid/ask price coloring (green/red)
+    - Volume and open interest with K/M suffixes
+    - Greeks display formatting (delta, gamma, theta, vega)
+    - Implied volatility as percentage
+    - Centered strike layout with calls left, puts right
+    - Automatic limiting to 21 strikes around ATM for large chains
+  - Multiple display formats:
+    - Detailed view with volume, OI, bid/ask
+    - Compact view with just strikes and symbols
+    - Greeks view focusing on option Greeks
+  - Export capabilities:
+    - CSV export with full option data
+    - JSON export with structured data
+  - Created `OptionHelpers` module with utility methods:
+    - Moneyness classification helpers
+    - Bid-ask spread calculations
+    - Market hours detection
+    - Option symbol formatting
+  - Non-TTY fallback rendering for environments without terminal support
+  - Performance optimized for large chains (<100ms rendering)
+  - Comprehensive test suite with 34 tests, all passing
 - Option chain retrieval from API with CLI and interactive features (#52)
   - Fixed API integration for existing option chain models:
     - Corrected OptionChain.get_chain to handle compact API response structure
